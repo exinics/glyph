@@ -30,7 +30,7 @@ Remove-Item Env:GLYPH_HOME
 Copy-Item "$root\config\GUIDE.md" "$out\Glyph\GUIDE.md" -ErrorAction SilentlyContinue
 Copy-Item "$root\README.md" "$out\Glyph\README.md"
 $zip = "$out\Glyph-win-x64.zip"
-Push-Location $out; tar -a -c -f $zip Glyph; Pop-Location
+Push-Location $out; & "$env:SystemRoot\System32\tar.exe" -a -c -f $zip Glyph; Pop-Location   # Windows' tar (Git's can't write zips)
 if ($LASTEXITCODE -ne 0) { throw "zip failed" }
 Write-Output "zip $zip ($([math]::Round((Get-Item $zip).Length / 1MB, 1)) MB)"
 
