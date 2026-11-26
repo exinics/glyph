@@ -24,7 +24,7 @@ internal sealed class Composer : IDisposable
     public EffectSettings Effects => Theme.Options.Effects;
 
     /// Loads the theme in use (or `themeOverride`, for the editor's preview).
-    public void Load(string? themeOverride = null)
+    public void Load(string? themeOverride = null, bool withWidgets = true)
     {
         var problems = new List<string>();
         var app = AppSettings.Load(problems);
@@ -40,7 +40,7 @@ internal sealed class Composer : IDisposable
         var scene = WallpaperScene.Load(theme, problems);
         var shortcuts = ShortcutStore.Load(problems);
         var widgets = new List<Widget>();
-        var wlist = WidgetsFile.Load(theme, problems).Widgets;
+        var wlist = withWidgets ? WidgetsFile.Load(theme, problems).Widgets : new List<WidgetOptions>();
         for (int k = 0; k < wlist.Count; k++)
         {
             var o = wlist[k];

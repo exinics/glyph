@@ -31,6 +31,9 @@ internal sealed class AppSettings
     [Category("Updates"), DisplayName("Update from"), Description("The GitHub project new versions come from (owner/name).")]
     public string UpdateRepo { get; set; } = "exinics/glyph";
 
+    [Section, Category("Screens"), DisplayName("Screens"), Description("What Glyph shows on each display: the same theme everywhere, a theme per screen, or only one screen"), TypeConverter(typeof(SectionConverter))]
+    public Glyph.Desktop.MonitorOptions Monitors { get; set; } = new();
+
     [Section, Category("Launcher"), DisplayName("Launcher"), Description("The pop-up search (Alt+Space): what it finds. Its look is in each theme"), TypeConverter(typeof(SectionConverter))]
     public Glyph.Launcher.LauncherSettings Launcher { get; set; } = new();
 

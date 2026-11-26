@@ -130,6 +130,20 @@ never looks. *Check for updates* in the tray menu looks straight away (`Glyph.ex
 Updates only replace `bin\`: your `config` folder (settings, themes, shortcuts) is never touched. What happened is in
 `logs\update-result.txt`.
 
+## 1c. More than one screen
+
+General > **Screens** says what goes on each display:
+
+- **Mode** `same`: the theme on every screen (each gets its own wallpaper, widgets and bar). `each`: a different
+  theme on each screen (*Screen 1 theme* … *Screen 4 theme*; `auto` = the theme in use, `none` = leave that screen
+  alone). `one`: only the *Main screen*; the others keep Windows' own wallpaper.
+- **Main screen**: `primary` (Windows' main display) or a display number, as in Windows' Settings > System >
+  Display (*Identify* shows them).
+- **Bar on** / **Widgets on**: `every` screen, or the `main` one only.
+
+Each screen rests on its own: a maximised window or a game on one screen doesn't stop the other. Plugging a display
+in or out is picked up within a second. Theme sync, window frames and the launcher follow the main screen's theme.
+
 ## 2. The settings window
 
 | Page | What's there |

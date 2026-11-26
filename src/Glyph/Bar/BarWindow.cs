@@ -26,6 +26,7 @@ internal sealed class BarWindow : NativeWindow, IDisposable
     const int WS_POPUP = unchecked((int)0x80000000), WS_EX_TOPMOST = 0x8, WS_EX_NOREDIRECTIONBITMAP = 0x00200000;
 
     public BarOptions O;
+    Rectangle screen;   // the display it sits on
     bool registered, tracking, hiddenForFullscreen;
     readonly object gate = new();
     int generation;
@@ -36,23 +37,23 @@ internal sealed class BarWindow : NativeWindow, IDisposable
 
     public (IntPtr hwnd, int gen, int w, int h) Current { get { lock (gate) return (Handle, generation, rect.Width, rect.Height); } }
 
-    public BarWindow(BarOptions o)
+    public BarWindow(BarOptions o, Rectangle screen)
     {
-        O = o;
+        O = o; this.screen = screen;
         CreateHandle(new CreateParams
         {
             Caption = "Glyph bar", Style = WS_POPUP,
             ExStyle = Native.WS_EX_TOOLWINDOW | WS_EX_TOPMOST | Native.WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP,
             X = 0, Y = 0, Width = 10, Height = 10,
         });
-        Apply(o);
+        Apply(o, screen);
         ShowWindow(Handle, 4 /* SW_SHOWNOACTIVATE */);
     }
 
     /// Applies (possibly changed) options: size, position, space reservation, blur, corners.
-    public void Apply(BarOptions o)
+    public void Apply(BarOptions o, Rectangle onScreen)
     {
-        O = o;
+        O = o; screen = onScreen;
         if (registered && !o.ReserveSpace) { Unregister(); }
         Place();
         int corner = o.Blur && o.CornerRadius > 0 ? 2 : 1;   // DWM rounds a blurred bar's corners; otherwise we draw them
@@ -76,7 +77,6 @@ internal sealed class BarWindow : NativeWindow, IDisposable
 
     void Place()
     {
-        var screen = Screen.PrimaryScreen!.Bounds;
         int total = O.Height + O.Margin * 2;
         bool top = O.Position != "bottom";
         var strip = new Native.RECT { Left = screen.Left, Right = screen.Right, Top = top ? screen.Top : screen.Bottom - total, Bottom = top ? screen.Top + total : screen.Bottom };

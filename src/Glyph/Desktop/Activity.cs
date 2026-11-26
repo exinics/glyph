@@ -10,6 +10,7 @@ internal static class Activity
 
     public static volatile bool Locked;
 
+    /// Why every screen should rest (locked, battery saver), or "".
     public static string Reason(PerformanceOptions s, out int fpsCap)
     {
         fpsCap = 0;
@@ -18,18 +19,32 @@ internal static class Activity
         if (onBattery && s.BatteryFps > 0) fpsCap = s.BatteryFps;
         if (s.PauseWhenLocked && Locked) return "locked";
         if (s.PauseOnBatterySaver && power.SystemStatusFlag == 1) return "battery saver";
-
-        var fg = Native.GetForegroundWindow();
-        var fgClass = fg == IntPtr.Zero ? "" : Native.ClassOf(fg);
-        bool fgIsShell = ShellClasses.Contains(fgClass);
-
-        if (s.PauseWhenFullscreen && !fgIsShell)
-        {
-            if (Native.SHQueryUserNotificationState(out int q) == 0 && (q == 3 || q == 4)) return "fullscreen app";
-            if (CoversMonitor(fg)) return "fullscreen app";
-        }
-        if (s.PauseWhenMaximized && AllMonitorsCovered()) return "maximised windows";
         return "";
+    }
+
+    /// The screens (by number) that can't be seen: a fullscreen app or maximised windows on them.
+    public static Dictionary<int, string> Covered(PerformanceOptions s)
+    {
+        var res = new Dictionary<int, string>();
+        var screens = Screens.All();
+        int NumberOf(IntPtr h) { var m = Native.MonitorFromWindow(h, 2); return screens.FirstOrDefault(x => x.Handle == m)?.Number ?? -1; }
+        var fg = Native.GetForegroundWindow();
+        bool fgIsShell = ShellClasses.Contains(fg == IntPtr.Zero ? "" : Native.ClassOf(fg));
+        if (s.PauseWhenFullscreen && !fgIsShell && fg != IntPtr.Zero)
+        {
+            bool full = (Native.SHQueryUserNotificationState(out int q) == 0 && (q == 3 || q == 4)) || CoversMonitor(fg);
+            if (full && NumberOf(fg) is int n and >= 0) res[n] = "fullscreen app";
+        }
+        if (s.PauseWhenMaximized)
+            Native.EnumWindows((h, _) =>
+            {
+                if (!Native.IsWindowVisible(h) || Native.IsIconic(h) || !Native.IsZoomed(h) || Native.IsCloaked(h)) return true;
+                if ((Native.GetWindowLong(h, Native.GWL_EXSTYLE) & Native.WS_EX_TOOLWINDOW) != 0) return true;
+                int n = NumberOf(h);
+                if (n >= 0) res.TryAdd(n, "maximised windows");
+                return res.Count < screens.Count;
+            }, IntPtr.Zero);
+        return res;
     }
 
     static bool CoversMonitor(IntPtr h)
@@ -42,19 +57,5 @@ internal static class Activity
         return r.Left <= mi.rcMonitor.Left && r.Top <= mi.rcMonitor.Top && r.Right >= mi.rcMonitor.Right && r.Bottom >= mi.rcMonitor.Bottom;
     }
 
-    static bool AllMonitorsCovered()
-    {
-        var monitors = new HashSet<IntPtr>();
-        Native.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr m, IntPtr _, ref Native.RECT _, IntPtr _) => { monitors.Add(m); return true; }, IntPtr.Zero);
-        if (monitors.Count == 0) return false;
-        var covered = new HashSet<IntPtr>();
-        Native.EnumWindows((h, _) =>
-        {
-            if (!Native.IsWindowVisible(h) || Native.IsIconic(h) || !Native.IsZoomed(h) || Native.IsCloaked(h)) return true;
-            if ((Native.GetWindowLong(h, Native.GWL_EXSTYLE) & Native.WS_EX_TOOLWINDOW) != 0) return true;
-            covered.Add(Native.MonitorFromWindow(h, 2));
-            return covered.Count < monitors.Count;
-        }, IntPtr.Zero);
-        return monitors.IsSubsetOf(covered);
-    }
+
 }

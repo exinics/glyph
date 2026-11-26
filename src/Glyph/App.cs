@@ -23,8 +23,8 @@ internal sealed class App : ApplicationContext
     IntPtr iconHandle;
     readonly ToolStripMenuItem updateItem;
     readonly System.Windows.Forms.Timer updateTimer = new() { Interval = 30_000 };
-    Glyph.Bar.BarWindow? barWindow;
-    string barKey = "";
+    readonly Dictionary<int, (Glyph.Bar.BarWindow win, string key)> bars = new();
+    string screensKey = Glyph.Desktop.Screens.Key();
     readonly Glyph.Tiling.TileManager tiles;
     readonly Glyph.Desktop.WindowFrames frames;
     readonly Glyph.Launcher.LauncherHost launcher;
@@ -90,11 +90,18 @@ internal sealed class App : ApplicationContext
         watcher.EnableRaisingEvents = true;
         debounce.Tick += (_, _) => { debounce.Stop(); engine.RequestReload(); };
 
-        checkTimer.Tick += (_, _) => { host.Check(); UpdateTooltip(); Taskbar.Enforce(engine.CurrentSettings.Taskbar); };
+        checkTimer.Tick += (_, _) =>
+        {
+            // a display added, removed or moved: work out again what goes on each screen
+            var k = Glyph.Desktop.Screens.Key();
+            if (k != screensKey) { screensKey = k; Log.Write("displays changed"); engine.RequestReload(); }
+            host.Check(); UpdateTooltip(); Taskbar.Enforce(engine.CurrentSettings.Taskbar);
+        };
         checkTimer.Start();
         activityTimer.Tick += (_, _) =>
         {
             engine.PauseReason = Glyph.Desktop.Activity.Reason(engine.CurrentSettings.Performance, out var cap);
+            engine.Covered = Glyph.Desktop.Activity.Covered(engine.CurrentSettings.Performance);
             engine.FpsCap = cap;
         };
         activityTimer.Start();
@@ -251,35 +258,38 @@ internal sealed class App : ApplicationContext
         DesktopIcons.Apply(s.HideDesktopIcons);
         Taskbar.Apply(s.Taskbar);
         SetIcon(s.Theme);
-        ApplyBar(engine.CurrentBar);
+        var plan = engine.Plan;
+        host.SetScreens(plan.Select(p => p.screen).ToList());
+        ApplyBars(plan);
         launcher.Search.S = s.Launcher;
         frames.Apply(engine.CurrentTheme);
         tiles.Apply(s.Tiling);
         Hotkeys.Apply(shell.Handle, HotkeyStore.Load(new List<string>()));
     }
 
-    /// Creates, updates or removes the bar window to match the theme.
-    void ApplyBar(Glyph.Bar.BarOptions? o)
+    /// Creates, updates or removes each screen's bar window to match its theme.
+    void ApplyBars(IReadOnlyList<(Glyph.Desktop.ScreenInfo screen, Glyph.Bar.BarOptions? bar)> plan)
     {
         try
         {
-            if (o == null || !o.Enabled)
+            foreach (var n in bars.Keys.ToList())
+                if (!plan.Any(p => p.screen.Number == n && p.bar is { Enabled: true })) { bars[n].win.Dispose(); bars.Remove(n); }
+            foreach (var (screen, o) in plan)
             {
-                if (barWindow != null) { engine.BarSource = null; barWindow.Dispose(); barWindow = null; barKey = ""; }
-                return;
+                if (o == null || !o.Enabled) continue;
+                var sb = new System.Text.StringBuilder();
+                Glyph.Options.Binder.WriteValues(sb, o);
+                var key = sb + "|" + screen.Bounds;
+                int n = screen.Number;
+                if (!bars.TryGetValue(n, out var b))
+                {
+                    var w = new Glyph.Bar.BarWindow(o, screen.Bounds);
+                    w.Mouse += (k, x, y, d) => engine.PostBarMouse(n, k, x, y, d);
+                    bars[n] = (w, key);
+                }
+                else if (key != b.key) { b.win.Apply(o, screen.Bounds); bars[n] = (b.win, key); }
             }
-            var sb = new System.Text.StringBuilder();
-            Glyph.Options.Binder.WriteValues(sb, o);
-            var key = sb.ToString();
-            if (barWindow == null)
-            {
-                barWindow = new Glyph.Bar.BarWindow(o);
-                barWindow.Mouse += (k, x, y, d) => engine.PostBarMouse(k, x, y, d);
-                var w = barWindow;
-                engine.BarSource = () => w.Current;
-            }
-            else if (key != barKey) barWindow.Apply(o);
-            barKey = key;
+            engine.BarSources = bars.ToDictionary(kv => kv.Key, kv => { var w = kv.Value.win; return (Func<(IntPtr, int, int, int)>)(() => w.Current); });
         }
         catch (Exception e) { Log.Write("bar: " + e); }
     }
@@ -399,8 +409,9 @@ internal sealed class App : ApplicationContext
         watcher.Dispose();
         engine.Stop();
         host.Dispose();
-        engine.BarSource = null;
-        barWindow?.Dispose();
+        engine.BarSources = new Dictionary<int, Func<(IntPtr, int, int, int)>>();
+        foreach (var b in bars.Values) b.win.Dispose();
+        bars.Clear();
         engine.Launcher = null;
         launcher.Dispose();
         tiles.Dispose();

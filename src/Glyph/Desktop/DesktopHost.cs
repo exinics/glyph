@@ -1,12 +1,14 @@
 namespace Glyph.Desktop;
 
-/// Owns the window that sits behind the desktop icons. On Windows 11 24H2 and later the icons
-/// (SHELLDLL_DefView) and a WorkerW both live inside Progman, with the WorkerW underneath;
-/// our window goes inside that WorkerW. On older builds the WorkerW is a separate top-level window.
+/// Owns the windows that sit behind the desktop icons: one per screen Glyph draws on, each exactly over its
+/// display. Screens without one keep Windows' own wallpaper. On Windows 11 24H2 and later the icons
+/// (SHELLDLL_DefView) and a WorkerW both live inside Progman, with the WorkerW underneath; our windows go
+/// inside that WorkerW. On older builds the WorkerW is a separate top-level window.
 internal sealed class DesktopHost : IDisposable
 {
     sealed class HostWindow : NativeWindow
     {
+        public ScreenInfo Screen = null!;
         protected override void WndProc(ref Message m)
         {
             switch (m.Msg)
@@ -20,16 +22,18 @@ internal sealed class DesktopHost : IDisposable
     }
 
     readonly object gate = new();
-    HostWindow? win;
+    readonly Dictionary<int, HostWindow> wins = new();
+    readonly Dictionary<int, Native.POINT> origins = new();
+    List<ScreenInfo> wanted = new();
     IntPtr parent;
     int generation;
     volatile int acknowledged = -1;
     readonly List<HostWindow> retired = new();
-    Native.POINT origin;
 
-    /// The current window and its generation (changes whenever the window is recreated).
-    public (IntPtr hwnd, int gen) Current { get { lock (gate) return (win?.Handle ?? IntPtr.Zero, generation); } }
-    public Native.POINT Origin { get { lock (gate) return origin; } }
+    /// The window on screen `n` and the generation (changes whenever any window is made, moved or removed).
+    public (IntPtr hwnd, int gen) Current(int n) { lock (gate) return (wins.TryGetValue(n, out var w) ? w.Handle : IntPtr.Zero, generation); }
+    /// Screen position of the top-left of screen `n`'s window.
+    public Native.POINT Origin(int n) { lock (gate) return origins.TryGetValue(n, out var p) ? p : default; }
     public void Acknowledge(int gen) => acknowledged = gen;
 
     public static IntPtr FindWallpaperParent()
@@ -55,52 +59,72 @@ internal sealed class DesktopHost : IDisposable
         return found != IntPtr.Zero ? found : progman;
     }
 
-    /// Creates (or recreates) the window. UI thread only.
-    public bool Attach()
+    /// Which screens get a window. UI thread only.
+    public void SetScreens(List<ScreenInfo> screens)
     {
-        var p = FindWallpaperParent();
+        lock (gate) wanted = screens.ToList();
+        Sync(false);
+    }
+
+    /// Finds the wallpaper's parent window again (e.g. after Explorer restarted) and remakes every window.
+    public bool Attach() => Sync(true);
+
+    bool Sync(bool remake)
+    {
+        var p = remake || parent == IntPtr.Zero || !Native.IsWindow(parent) ? FindWallpaperParent() : parent;
         if (p == IntPtr.Zero) { Log.Write("desktop: no Progman window yet"); return false; }
-        if (!Native.IsWindowVisible(p)) Log.Write("desktop: note, the wallpaper WorkerW is hidden");
-        Native.GetClientRect(p, out var rc);
-        var w = new HostWindow();
-        w.CreateHandle(new CreateParams
-        {
-            Caption = "Glyph wallpaper",
-            Parent = p,
-            Style = Native.WS_CHILD | Native.WS_VISIBLE | Native.WS_CLIPSIBLINGS | Native.WS_CLIPCHILDREN,
-            X = 0, Y = 0, Width = Math.Max(1, rc.Width), Height = Math.Max(1, rc.Height),
-        });
-        var pt = new Native.POINT();
-        Native.ClientToScreen(w.Handle, ref pt);
+        bool newParent = p != parent;
+        var porg = new Native.POINT();
+        Native.ClientToScreen(p, ref porg);
+        List<ScreenInfo> want;
+        lock (gate) want = wanted.ToList();
+        bool changed = false;
         lock (gate)
         {
-            if (win != null) retired.Add(win);
-            win = w; parent = p; generation++; origin = pt;
+            foreach (var (n, w) in wins.ToList())
+                if (remake || newParent || !want.Any(s => s.Number == n) || !Native.IsWindow(w.Handle) || Native.GetParent(w.Handle) != p)
+                {
+                    retired.Add(w); wins.Remove(n); origins.Remove(n); changed = true;
+                }
         }
-        Log.Write($"desktop: attached to {Native.ClassOf(p)} 0x{p.ToInt64():X} under {Native.ClassOf(Native.GetParent(p))}, {rc.Width}x{rc.Height} at {pt.X},{pt.Y}");
+        foreach (var s in want)
+        {
+            int x = s.Bounds.X - porg.X, y = s.Bounds.Y - porg.Y;
+            HostWindow? w;
+            lock (gate) wins.TryGetValue(s.Number, out w);
+            if (w == null)
+            {
+                w = new HostWindow { Screen = s };
+                w.CreateHandle(new CreateParams
+                {
+                    Caption = "Glyph wallpaper", Parent = p,
+                    Style = Native.WS_CHILD | Native.WS_VISIBLE | Native.WS_CLIPSIBLINGS | Native.WS_CLIPCHILDREN,
+                    X = x, Y = y, Width = Math.Max(1, s.Bounds.Width), Height = Math.Max(1, s.Bounds.Height),
+                });
+                lock (gate) wins[s.Number] = w;
+                changed = true;
+                Log.Write($"desktop: screen {Screens.Describe(s)} under {Native.ClassOf(p)} 0x{p.ToInt64():X}");
+            }
+            else if (w.Screen.Bounds != s.Bounds)
+            {
+                Native.MoveWindow(w.Handle, x, y, Math.Max(1, s.Bounds.Width), Math.Max(1, s.Bounds.Height), false);
+                w.Screen = s; changed = true;
+            }
+            var pt = new Native.POINT();
+            Native.ClientToScreen(w.Handle, ref pt);
+            lock (gate) origins[s.Number] = pt;
+        }
+        lock (gate) { parent = p; if (changed) generation++; }
         return true;
     }
 
-    /// Called every second on the UI thread: reattaches if Explorer restarted, follows size changes,
+    /// Called every second on the UI thread: reattaches if Explorer restarted, keeps windows over their screens,
     /// and destroys old windows once the render thread has moved off them.
     public void Check()
     {
-        HostWindow? w; IntPtr p;
-        lock (gate) { w = win; p = parent; }
-        if (w == null || !Native.IsWindow(p) || !Native.IsWindow(w.Handle) || Native.GetParent(w.Handle) != p)
-        {
-            Attach();
-        }
-        else
-        {
-            Native.GetClientRect(p, out var prc);
-            Native.GetClientRect(w.Handle, out var wrc);
-            if (prc.Width != wrc.Width || prc.Height != wrc.Height)
-                Native.MoveWindow(w.Handle, 0, 0, Math.Max(1, prc.Width), Math.Max(1, prc.Height), false);
-            var pt = new Native.POINT();
-            Native.ClientToScreen(w.Handle, ref pt);
-            lock (gate) origin = pt;
-        }
+        bool broken;
+        lock (gate) broken = parent == IntPtr.Zero || !Native.IsWindow(parent) || wins.Values.Any(w => !Native.IsWindow(w.Handle) || Native.GetParent(w.Handle) != parent);
+        Sync(broken);
         lock (gate)
         {
             if (acknowledged == generation && retired.Count > 0)
@@ -117,8 +141,8 @@ internal sealed class DesktopHost : IDisposable
         {
             foreach (var r in retired) { try { r.DestroyHandle(); } catch { } }
             retired.Clear();
-            try { win?.DestroyHandle(); } catch { }
-            win = null;
+            foreach (var w in wins.Values) { try { w.DestroyHandle(); } catch { } }
+            wins.Clear();
         }
     }
 }

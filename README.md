@@ -57,7 +57,14 @@ Glyph\
   `[Color]`, `[Section]`. The same classes are read from TOML (with typo/range/colour checks), shown in the
   settings window's PropertyGrids, written back with comments, and turned into the guide's tables.
 - **Desktop host** (`Desktop\DesktopHost.cs`): 0x052C to Progman makes the WorkerW under the icons (24H2+: a child
-  of Progman); our child window lives there. Re-attaches on Explorer restart.
+  of Progman); one child window per screen Glyph uses lives there, placed over its display (screens without one show
+  Windows' wallpaper). Re-attaches on Explorer restart.
+- **Screens** (`Desktop\Screens.cs`, glyph.toml `[monitors]`): displays by Windows' number (\\.\DISPLAYn).
+  `MonitorOptions.Plan` gives (screen, theme, widgets?, bar?) for modes same / each / one. `Engine` keeps a `Surface` per
+  screen (own Composer, theme, desktop and bar renderers sharing one GPU device, pause state); clicks and the wheel go to
+  the surface whose bounds hold them; work areas are read live (`Screens.WorkOf`) so bars' reserved space counts.
+  `Activity.Covered` rests each screen separately. App makes one BarWindow per planned bar and calls
+  `host.SetScreens(plan)` after every reload; a change in `Screens.Key()` (checked every second) triggers a reload.
   `Desktop\DesktopIcons.cs` hides/shows Windows' icons (WM_COMMAND 0x7402 to SHELLDLL_DefView) and only restores
   what it changed.
 - **Theme sync** (`Desktop\ThemeSync.cs`, theme `[sync]`, glyph.toml `theme_sync`): Windows Terminal settings.json edited
