@@ -5,13 +5,27 @@ using Glyph.Options;
 namespace Glyph.Desktop;
 
 /// One display. Number = Windows' own display number (\\.\DISPLAY2 = 2), as in Settings > System > Display.
-internal sealed record ScreenInfo(int Number, Rectangle Bounds, Rectangle Work, bool Primary, IntPtr Handle);
+/// Scale = Windows' display scaling for it (1 = 100%, 1.5 = 150%).
+internal sealed record ScreenInfo(int Number, Rectangle Bounds, Rectangle Work, bool Primary, IntPtr Handle, float Scale = 1);
 
 internal static class Screens
 {
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     struct MONITORINFOEX { public int cbSize; public Native.RECT rcMonitor, rcWork; public uint dwFlags; [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string szDevice; }
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool GetMonitorInfo(IntPtr mon, ref MONITORINFOEX mi);
+    [DllImport("shcore.dll")] static extern int GetDpiForMonitor(IntPtr mon, int type, out uint x, out uint y);
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(Native.POINT p, uint flags);
+
+    /// Windows' scaling for a display (1 = 100%).
+    public static float ScaleOf(IntPtr mon) => TestScale ?? (GetDpiForMonitor(mon, 0 /* effective */, out var x, out _) == 0 && x > 0 ? x / 96f : 1f);
+    /// GLYPH_SCALE=1.5 pretends every display is scaled that much (for testing scaling on a 100% screen).
+    static readonly float? TestScale = float.TryParse(Environment.GetEnvironmentVariable("GLYPH_SCALE"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var t) && t > 0.2f ? t : null;
+    public static float ScaleAt(int x, int y) => ScaleOf(MonitorFromPoint(new Native.POINT { X = x, Y = y }, 2));
+
+    /// Whether Glyph follows Windows' scaling (glyph.toml [monitors] scaling). Set when settings load.
+    public static volatile bool Scaling = true;
+    /// The scale to draw at on a display, or 1 when scaling is off.
+    public static float Use(float scale) => Scaling ? scale : 1f;
 
     /// Every display, by number. Safe on any thread.
     public static List<ScreenInfo> All()
@@ -25,7 +39,7 @@ internal static class Screens
                 var digits = new string((mi.szDevice ?? "").Reverse().TakeWhile(char.IsDigit).Reverse().ToArray());
                 int n = int.TryParse(digits, out var k) ? k : list.Count + 1;
                 while (list.Any(s => s.Number == n)) n++;
-                list.Add(new ScreenInfo(n, R(mi.rcMonitor), R(mi.rcWork), (mi.dwFlags & 1) != 0, m));
+                list.Add(new ScreenInfo(n, R(mi.rcMonitor), R(mi.rcWork), (mi.dwFlags & 1) != 0, m, ScaleOf(m)));
             }
             return true;
         }, IntPtr.Zero);
@@ -42,7 +56,7 @@ internal static class Screens
     static Rectangle R(Native.RECT r) => Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom);
 
     /// Changes when a display is added, removed, moved or resized (not when the work area changes).
-    public static string Key() => string.Join(";", All().Select(s => $"{s.Number}:{s.Bounds}"));
+    public static string Key() => string.Join(";", All().Select(s => $"{s.Number}:{s.Bounds}:{s.Scale}"));
 
     /// The screen a setting names: "primary" or a number (falls back to the primary display).
     public static ScreenInfo Pick(List<ScreenInfo> all, string which)
@@ -51,7 +65,14 @@ internal static class Screens
         return all.FirstOrDefault(s => s.Primary) ?? all.First();
     }
 
-    public static string Describe(ScreenInfo s) => $"{s.Number}: {s.Bounds.Width}×{s.Bounds.Height}{(s.Primary ? ", main display" : "")}";
+    public static string Describe(ScreenInfo s) => $"{s.Number}: {s.Bounds.Width}×{s.Bounds.Height} at {s.Scale * 100:0}%{(s.Primary ? ", main display" : "")}";
+
+    /// A font made bigger for a scaled display (characters, the bar's font).
+    public static FontOptions Scaled(FontOptions f, float s) => Math.Abs(s - 1) < 0.01f ? f : new FontOptions
+    {
+        Font = f.Font, FontSize = f.FontSize * s, FontWeight = f.FontWeight, LineSpacing = f.LineSpacing,
+        CellWidth = (int)MathF.Round(f.CellWidth * s), CellHeight = (int)MathF.Round(f.CellHeight * s),
+    };
 }
 
 /// glyph.toml [monitors]: what Glyph shows on each display.
@@ -67,6 +88,8 @@ internal sealed class MonitorOptions
     public string Bar { get; set; } = "every";
     [DisplayName("Widgets on"), Description("every = each screen shows its theme's widgets. main = widgets only on the main screen (the others just show the wallpaper)."), Choices("every", "main"), TypeConverter(typeof(ChoicesConverter))]
     public string Widgets { get; set; } = "every";
+    [DisplayName("Follow Windows scaling"), Description("Make everything bigger on screens Windows scales up (Settings > System > Display > Scale), each screen by its own amount. Off = sizes are exact pixels on every screen.")]
+    public bool Scaling { get; set; } = true;
     [DisplayName("Screen 1 theme"), Description("each: the theme on display 1. auto = the theme in use (Themes page), none = leave this screen alone (Windows' wallpaper)."), TypeConverter(typeof(ThemeNameConverter))]
     public string Screen1 { get; set; } = "auto";
     [DisplayName("Screen 2 theme"), Description("each: the theme on display 2."), TypeConverter(typeof(ThemeNameConverter))] public string Screen2 { get; set; } = "auto";

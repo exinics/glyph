@@ -31,16 +31,16 @@ internal sealed class AppSettings
     [Category("Updates"), DisplayName("Update from"), Description("The GitHub project new versions come from (owner/name).")]
     public string UpdateRepo { get; set; } = "exinics/glyph";
 
-    [Section, Category("Screens"), DisplayName("Screens"), Description("What Glyph shows on each display: the same theme everywhere, a theme per screen, or only one screen"), TypeConverter(typeof(SectionConverter))]
+    [Section, Category("More"), DisplayName("Screens"), Description("What Glyph shows on each display: the same theme everywhere, a theme per screen, or only one screen"), TypeConverter(typeof(SectionConverter))]
     public Glyph.Desktop.MonitorOptions Monitors { get; set; } = new();
 
-    [Section, Category("Launcher"), DisplayName("Launcher"), Description("The pop-up search (Alt+Space): what it finds. Its look is in each theme"), TypeConverter(typeof(SectionConverter))]
+    [Section, Category("More"), DisplayName("Launcher"), Description("The pop-up search (Alt+Space): what it finds. Its look is in each theme"), TypeConverter(typeof(SectionConverter))]
     public Glyph.Launcher.LauncherSettings Launcher { get; set; } = new();
 
-    [Section, Category("Tiling"), DisplayName("Tiling"), Description("Windows arranged side by side automatically"), TypeConverter(typeof(SectionConverter))]
+    [Section, Category("More"), DisplayName("Tiling"), Description("Windows arranged side by side automatically"), TypeConverter(typeof(SectionConverter))]
     public Glyph.Tiling.TilingOptions Tiling { get; set; } = new();
 
-    [Section, Category("Performance"), DisplayName("Performance"), Description("When Glyph rests to save power"), TypeConverter(typeof(SectionConverter))]
+    [Section, Category("More"), DisplayName("Performance"), Description("When Glyph rests to save power"), TypeConverter(typeof(SectionConverter))]
     public PerformanceOptions Performance { get; set; } = new();
 
     public static string FilePath => Path.Combine(Paths.Config, "glyph.toml");

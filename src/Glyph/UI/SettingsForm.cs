@@ -93,12 +93,17 @@ internal sealed partial class SettingsForm : Form
         AddPage("Look", "Colours & look", BuildLook());
         AddPage("Design", "Design", BuildDesign());
         AddPage("Themes", "Themes", BuildThemes());
-        var logo = new Label { Text = ">_ glyph", Dock = DockStyle.Top, Height = 64, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(20, 0, 0, 0), Font = new Font("Cascadia Mono", 16f, FontStyle.Bold) };
-        sidebar.Controls.Add(logo);
+        // the app's G and its name at the top of the sidebar
+        var logoBox = new Panel { Dock = DockStyle.Top, Height = 64 };
+        var logo = new Label { Text = "glyph", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Cascadia Mono", 16f, FontStyle.Bold) };
+        var mark = new PictureBox { Dock = DockStyle.Left, Width = 58, SizeMode = PictureBoxSizeMode.CenterImage };
+        try { mark.Image = Updater.AppIcon(32).ToBitmap(); } catch { }
+        logoBox.Controls.Add(logo); logoBox.Controls.Add(mark);
+        sidebar.Controls.Add(logoBox);
 
         Dark.Apply(this);
         sidebar.BackColor = Dark.Panel;
-        logo.BackColor = Dark.Panel; logo.ForeColor = Dark.Accent;
+        logoBox.BackColor = mark.BackColor = logo.BackColor = Dark.Panel; logo.ForeColor = Dark.Accent;
         foreach (var b in navButtons.Values) StyleNav(b, false);
         editing.ForeColor = Dark.Dim;
         HandleCreated += (_, _) => Dark.TitleBar(this);
@@ -922,6 +927,18 @@ internal sealed partial class SettingsForm : Form
         B("Open config folder", () => Open(Paths.Config));
         B("Open guide", () => Open(Paths.Guide));
         B("Open log", () => Open(Path.Combine(Paths.Logs, "glyph.log")));
+        buttons.Controls.Add(new Label { Text = "", Height = 10, Width = 280 });
+        B("Check for updates now", () =>
+        {
+            if (MainGlyph().Count == 0) { status.Text = "Start Glyph first: it does the updating."; return; }
+            Native.SendAction("glyph:update");
+            status.Text = "Glyph is checking GitHub for a newer version (a note appears by the tray icon).";
+        });
+        buttons.Controls.Add(new Label
+        {
+            AutoSize = false, Width = 280, Height = 70, ForeColor = Dark.Dim, UseMnemonic = false,
+            Text = $"Glyph {Updater.CurrentText}\nUpdates are looked for 30 seconds after Glyph starts, then every 6 hours (Updates, on the left).",
+        });
         split.Panel2.Controls.Add(buttons);
         appGrid.PropertyValueChanged += (_, _) => { MarkApp(); loading = true; hideIcons.Checked = app.HideDesktopIcons; loading = false; };
         return split;

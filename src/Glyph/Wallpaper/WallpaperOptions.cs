@@ -110,6 +110,12 @@ internal sealed class InteractionOptions
     [Category("Trail"), DisplayName("Trail colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string TrailColor { get; set; } = "accent_dim";
     [Category("Trail"), DisplayName("Trail time"), Description("Seconds each mark lasts."), Range(0.05, 10)] public float TrailDuration { get; set; } = 0.6f;
     [Category("Trail"), DisplayName("Trail characters"), Description("Terminal style: newest to oldest.")] public string TrailChars { get; set; } = "*+:·.";
+    [Category("Selection box"), DisplayName("Selection box"), Description("Drag on empty desktop to draw a box, like Windows' blue one (Windows only draws its own while its desktop icons are showing).")] public bool SelectBox { get; set; } = true;
+    [Category("Selection box"), DisplayName("Box frame"), Description("Draw it with a frame from the Frames page instead of the colours below. none = the colours below."), TypeConverter(typeof(FrameNameConverter))] public string SelectFrame { get; set; } = "none";
+    [Category("Selection box"), DisplayName("Box colour"), Description("Inside of the box."), Color, TypeConverter(typeof(ColorNameConverter))] public string SelectColor { get; set; } = "accent";
+    [Category("Selection box"), DisplayName("Box opacity"), Description("How see-through the inside is (0 = clear, 1 = solid)."), Range(0, 1)] public float SelectOpacity { get; set; } = 0.18f;
+    [Category("Selection box"), DisplayName("Box border"), Color, TypeConverter(typeof(ColorNameConverter))] public string SelectBorder { get; set; } = "accent";
+    [Category("Selection box"), DisplayName("Box border width"), Description("In pixels (terminal style: any value draws a line of characters)."), Range(0, 20)] public float SelectBorderWidth { get; set; } = 1;
 }
 
 internal sealed class CursorOptions

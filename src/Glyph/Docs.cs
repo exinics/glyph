@@ -140,6 +140,9 @@ General > **Screens** says what goes on each display:
 - **Main screen**: `primary` (Windows' main display) or a display number, as in Windows' Settings > System >
   Display (*Identify* shows them).
 - **Bar on** / **Widgets on**: `every` screen, or the `main` one only.
+- **Follow Windows scaling** (on): each screen is drawn at its own Windows scale (Settings > System > Display >
+  Scale), so a 150% screen gets everything half as big again: panels, text, the bar, the launcher and window frames.
+  Off = theme sizes are exact pixels everywhere.
 
 Each screen rests on its own: a maximised window or a game on one screen doesn't stop the other. Plugging a display
 in or out is picked up within a second. Theme sync, window frames and the launcher follow the main screen's theme.
@@ -269,7 +272,9 @@ colour (if it does something on click). Text, clock, system and the other info w
 The **background** can be interactive too (Wallpaper > Interaction, or click the background on the Design page):
 what clicking, double-clicking and scrolling on empty desktop does (e.g. scroll for volume, double-click to open a
 folder), a **ripple** where you click, and a **mouse trail**. Wallpaper layers can have **Parallax X / Y** so they
-shift against the mouse for a feeling of depth.
+shift against the mouse for a feeling of depth. Dragging on empty desktop draws a **selection box** like
+Windows' blue one (Windows only draws its own while its icons are showing): Wallpaper > Interaction > *Selection box*
+sets its colour, see-through-ness and border, or *Box frame* draws it with a frame from the Frames page.
 
 ## 6b3. Videos on the desktop
 

@@ -27,6 +27,7 @@ internal sealed class BarWindow : NativeWindow, IDisposable
 
     public BarOptions O;
     Rectangle screen;   // the display it sits on
+    float scale = 1;    // its scaling (1 = 100%)
     bool registered, tracking, hiddenForFullscreen;
     readonly object gate = new();
     int generation;
@@ -37,23 +38,23 @@ internal sealed class BarWindow : NativeWindow, IDisposable
 
     public (IntPtr hwnd, int gen, int w, int h) Current { get { lock (gate) return (Handle, generation, rect.Width, rect.Height); } }
 
-    public BarWindow(BarOptions o, Rectangle screen)
+    public BarWindow(BarOptions o, Rectangle screen, float scale = 1)
     {
-        O = o; this.screen = screen;
+        O = o; this.screen = screen; this.scale = scale;
         CreateHandle(new CreateParams
         {
             Caption = "Glyph bar", Style = WS_POPUP,
             ExStyle = Native.WS_EX_TOOLWINDOW | WS_EX_TOPMOST | Native.WS_EX_NOACTIVATE | WS_EX_NOREDIRECTIONBITMAP,
             X = 0, Y = 0, Width = 10, Height = 10,
         });
-        Apply(o, screen);
+        Apply(o, screen, scale);
         ShowWindow(Handle, 4 /* SW_SHOWNOACTIVATE */);
     }
 
     /// Applies (possibly changed) options: size, position, space reservation, blur, corners.
-    public void Apply(BarOptions o, Rectangle onScreen)
+    public void Apply(BarOptions o, Rectangle onScreen, float atScale = 1)
     {
-        O = o; screen = onScreen;
+        O = o; screen = onScreen; scale = atScale;
         if (registered && !o.ReserveSpace) { Unregister(); }
         Place();
         int corner = o.Blur && o.CornerRadius > 0 ? 2 : 1;   // DWM rounds a blurred bar's corners; otherwise we draw them
@@ -77,7 +78,8 @@ internal sealed class BarWindow : NativeWindow, IDisposable
 
     void Place()
     {
-        int total = O.Height + O.Margin * 2;
+        int height = (int)MathF.Round(O.Height * scale), margin = (int)MathF.Round(O.Margin * scale);
+        int total = height + margin * 2;
         bool top = O.Position != "bottom";
         var strip = new Native.RECT { Left = screen.Left, Right = screen.Right, Top = top ? screen.Top : screen.Bottom - total, Bottom = top ? screen.Top + total : screen.Bottom };
         if (O.ReserveSpace)
@@ -91,7 +93,7 @@ internal sealed class BarWindow : NativeWindow, IDisposable
             SHAppBarMessage(ABM_SETPOS, ref abd);
             strip = abd.rc;
         }
-        var r = new Native.RECT { Left = strip.Left + O.Margin, Right = strip.Right - O.Margin, Top = strip.Top + O.Margin, Bottom = strip.Bottom - O.Margin };
+        var r = new Native.RECT { Left = strip.Left + margin, Right = strip.Right - margin, Top = strip.Top + margin, Bottom = strip.Bottom - margin };
         SetWindowPos(Handle, (IntPtr)(-1) /* HWND_TOPMOST */, r.Left, r.Top, r.Width, r.Height, 0x0010 /* NOACTIVATE */);
         lock (gate) { rect = r; generation++; }
     }

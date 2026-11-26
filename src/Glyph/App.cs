@@ -141,6 +141,7 @@ internal sealed class App : ApplicationContext
                     case "pause": TogglePause(); break;
                     case "quit": Quit(); break;
                     case "convert": RunSelf("--convert-gui"); break;
+                    case "update": CheckUpdates(true); break;
                 }
                 return true;
             case "shortcut":
@@ -279,15 +280,16 @@ internal sealed class App : ApplicationContext
                 if (o == null || !o.Enabled) continue;
                 var sb = new System.Text.StringBuilder();
                 Glyph.Options.Binder.WriteValues(sb, o);
-                var key = sb + "|" + screen.Bounds;
+                float sc = Glyph.Desktop.Screens.Use(screen.Scale);
+                var key = sb + "|" + screen.Bounds + "|" + sc;
                 int n = screen.Number;
                 if (!bars.TryGetValue(n, out var b))
                 {
-                    var w = new Glyph.Bar.BarWindow(o, screen.Bounds);
+                    var w = new Glyph.Bar.BarWindow(o, screen.Bounds, sc);
                     w.Mouse += (k, x, y, d) => engine.PostBarMouse(n, k, x, y, d);
                     bars[n] = (w, key);
                 }
-                else if (key != b.key) { b.win.Apply(o, screen.Bounds); bars[n] = (b.win, key); }
+                else if (key != b.key) { b.win.Apply(o, screen.Bounds, sc); bars[n] = (b.win, key); }
             }
             engine.BarSources = bars.ToDictionary(kv => kv.Key, kv => { var w = kv.Value.win; return (Func<(IntPtr, int, int, int)>)(() => w.Current); });
         }

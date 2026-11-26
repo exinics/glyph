@@ -48,6 +48,14 @@ internal sealed class WindowFrames : IDisposable
     /// Space tiling should leave around each window (left, top, right, bottom), or null.
     public static (int l, int t, int r, int b)? Room { get; private set; }
 
+    /// Room on a given display (frames are drawn bigger on scaled-up screens), or null.
+    public static (int l, int t, int r, int b)? RoomFor(IntPtr monitor)
+    {
+        if (Room is not { } r) return null;
+        float s = Screens.Use(Screens.ScaleOf(monitor));
+        return ((int)MathF.Ceiling(r.l * s), (int)MathF.Ceiling(r.t * s), (int)MathF.Ceiling(r.r * s), (int)MathF.Ceiling(r.b * s));
+    }
+
     sealed class Set
     {
         public readonly Strip[] Strips = { new(), new(), new(), new() };
@@ -209,8 +217,9 @@ internal sealed class WindowFrames : IDisposable
             if (!sets.TryGetValue(h, out var s)) { s = new Set(); sets[h] = s; Style(h, true); order = true; Log.D($"window frame on \"{Native.GetWindowTextOf(h)}\""); }
             if (!numbers.ContainsKey(h)) { int n = 1; while (numbers.ContainsValue(n)) n++; numbers[h] = n; }
             string title = TitleFor(h);
-            string key = $"{win.Width}x{win.Height}|{f.Name}|{title}";
-            if (key != s.Key) { Draw(s, f, win, title); s.Key = key; s.Win = win; }
+            float scale = Screens.Use(Screens.ScaleOf(Native.MonitorFromWindow(h, 2)));
+            string key = $"{win.Width}x{win.Height}|{f.Name}|{title}|{scale}";
+            if (key != s.Key) { Draw(s, f, win, title, scale); s.Key = key; s.Win = win; }
             else if (win.Location != s.Win.Location) { MoveSet(s, win.X - s.Win.X, win.Y - s.Win.Y); s.Win = win; }
             if (order || !s.Ordered) { Order(h, s); s.Ordered = true; }
         }
@@ -250,17 +259,19 @@ internal sealed class WindowFrames : IDisposable
         return ((int)MathF.Ceiling(g + outs.L), (int)MathF.Ceiling(g + above + bar + outs.T), (int)MathF.Ceiling(g + outs.R), (int)MathF.Ceiling(g + outs.B));
     }
 
-    void Draw(Set s, FrameOptions f, Rectangle win, string title)
+    /// Draws the frame in pixels ÷ `sc` (so it's sized like everything else on a scaled display), scaled up.
+    void Draw(Set s, FrameOptions f, Rectangle win, string title, float sc = 1)
     {
+        var winL = new RectangleF(win.X / sc, win.Y / sc, win.Width / sc, win.Height / sc);
         float bw = f.Border != "none" ? f.BorderWidth : 0;
         float above = FramePainter.Above(f, t!, t!.Options.Ui.FontSize, title.Length > 0);
         float bar = f.Header == "bar" && title.Length > 0 ? FramePainter.StripH(f, t, t.Options.Ui.FontSize) : 0;
         var outs = FramePainter.Outside(f);
         float g = o.Gap + bw;
         // the frame's box sits around the window (a title strip above it); the strips cover everything outside the window
-        var box = RectangleF.FromLTRB(win.Left - g, win.Top - g - bar, win.Right + g, win.Bottom + g);
+        var box = RectangleF.FromLTRB(winL.Left - g, winL.Top - g - bar, winL.Right + g, winL.Bottom + g);
         var outer = RectangleF.FromLTRB(box.Left, box.Top - above, box.Right, box.Bottom);
-        var all = Rectangle.FromLTRB((int)MathF.Floor(outer.Left - outs.L - 1), (int)MathF.Floor(outer.Top - outs.T - 1), (int)MathF.Ceiling(outer.Right + outs.R + 1), (int)MathF.Ceiling(outer.Bottom + outs.B + 1));
+        var all = Rectangle.FromLTRB((int)MathF.Floor((outer.Left - outs.L - 1) * sc), (int)MathF.Floor((outer.Top - outs.T - 1) * sc), (int)MathF.Ceiling((outer.Right + outs.R + 1) * sc), (int)MathF.Ceiling((outer.Bottom + outs.B + 1) * sc));
         var rects = new[]
         {
             Rectangle.FromLTRB(all.Left, all.Top, all.Right, win.Top),
@@ -274,7 +285,7 @@ internal sealed class WindowFrames : IDisposable
             st.R = r;
             if (r.Width <= 0 || r.Height <= 0) { Native.ShowWindow(st.Handle, 0); continue; }
             var c = soft!.Begin(r.Width, r.Height);
-            c.Dc.Transform = Matrix3x2.CreateTranslation(-r.X, -r.Y);
+            c.Dc.Transform = Matrix3x2.CreateScale(sc) * Matrix3x2.CreateTranslation(-r.X, -r.Y);
             try { FramePainter.Draw(c, f, t, outer, title, "", t.Options.Ui.FontSize, false, fill: false); }
             catch (Exception e) { Log.D("window frame: " + e.Message); }
             soft.End();

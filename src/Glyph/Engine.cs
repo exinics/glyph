@@ -93,6 +93,7 @@ internal sealed class Engine
         public ScreenInfo S;
         public string ThemeName = "";
         public bool Widgets = true, ShowBar = true;
+        public float Scale = 1;
         public readonly Composer Comp = new();
         public readonly BarScene Bar = new();
         // desktop
@@ -130,6 +131,7 @@ internal sealed class Engine
     void LoadAll()
     {
         var app = AppSettings.Load(new List<string>());
+        Screens.Scaling = app.Monitors.Scaling;
         var plan = app.Monitors.Plan(app.Theme);
         var old = surfaces.ToDictionary(f => f.S.Number);
         var next = new List<Surface>();
@@ -138,7 +140,9 @@ internal sealed class Engine
             if (!old.Remove(screen.Number, out var f)) { f = new Surface(screen); Hook(f.Comp); }
             if (f.S.Bounds != screen.Bounds) f.Force = f.BarForce = true;
             f.S = screen; f.ThemeName = theme; f.Widgets = widgets; f.ShowBar = bar;
+            f.Scale = Screens.Use(screen.Scale);
             f.Comp.Load(theme, widgets);
+            f.Comp.Scale = f.Scale;
             f.Bar.Load(f.Comp.Theme, f.Comp.Problems);
             f.Force = f.BarForce = true;
             next.Add(f);
@@ -284,12 +288,13 @@ internal sealed class Engine
         }
         var r = f.R;
         if (comp.Generation != f.CompGen) { r.Canvas.Reset(); f.CompGen = comp.Generation; f.Force = true; }
-        if (comp.Font.Key != f.FontKey)
+        var font = Screens.Scaled(comp.Font, f.Scale);
+        if (font.Key != f.FontKey)
         {
             comp.RenderProblems.Clear();
-            var fp = r.SetFont(comp.Font);
+            var fp = r.SetFont(font);
             if (fp != null) comp.RenderProblems.Add(fp);
-            f.FontKey = comp.Font.Key;
+            f.FontKey = font.Key;
             f.Force = true;
         }
 
@@ -311,14 +316,15 @@ internal sealed class Engine
         }
         foreach (var wh in wheelList) if (f.S.Bounds.Contains(wh.x, wh.y)) comp.Wheel(wh.x - o.X, wh.y - o.Y, wh.delta);
         if (moved && here && overDesk) comp.AddTrail(mx, my);
+        bool selChanged = moved && comp.DragTo(mx, my);
         bool animated = comp.Animated;
         comp.Env.Canvas = r.Canvas;
         var sig = comp.Signature();
         bool changed = sig != f.LastSig;
         f.LastSig = sig;
-        bool draw = f.Force || resized || hoverChanged || clicked || animated || changed || (moved && here && (comp.Scene.CursorOn || comp.Scene.Parallax));
+        bool draw = f.Force || resized || hoverChanged || clicked || animated || changed || selChanged || (moved && here && (comp.Scene.CursorOn || comp.Scene.Parallax));
 
-        int fps = animated || comp.Scene.CursorOn ? comp.Scene.Fps : 15;
+        int fps = comp.Selecting ? 60 : animated || comp.Scene.CursorOn ? comp.Scene.Fps : 15;
         if (!draw) { f.Last = now; return (false, fps); }
 
         f.Force = false;
@@ -328,7 +334,7 @@ internal sealed class Engine
         var atlas = r.Atlas!;
         comp.Compose(r.Width, r.Height, atlas.CellW, atlas.CellH, (float)f.Time, dt, mx, my, area);
         r.Draw(comp.Grid, comp.Effects, (float)f.Time, comp.ClearColor,
-            comp.HasBackdrop ? comp.DrawBackdrop : null, comp.HasVectorLayer ? comp.DrawWidgets : null);
+            comp.HasBackdrop ? comp.Scaled(comp.DrawBackdrop) : null, comp.HasVectorLayer ? comp.Scaled(comp.DrawWidgets) : null);
         if (!r.Present()) { Log.Write("graphics device lost; rebuilding"); r.Dispose(); f.R = null; }
         return (true, fps);
     }
@@ -352,15 +358,16 @@ internal sealed class Engine
         }
         var barR = f.BarR;
         if (comp.Generation != f.BarCompGen) { barR.Canvas.Reset(); f.BarCompGen = comp.Generation; f.BarForce = true; }
-        var bf = bar.BarFont();
+        var bf = Screens.Scaled(bar.BarFont(), f.Scale);
         if (bf.Key != f.BarFontKey) { barR.SetFont(bf); f.BarFontKey = bf.Key; f.BarForce = true; }
+        float vs = comp.Theme.Smooth ? f.Scale : 1;   // smooth bars are laid out in pixels ÷ scale and drawn scaled up
         if (barR.Width != bw || barR.Height != bhh) { barR.Resize(bw, bhh); f.BarForce = true; }
         var atlas = barR.Atlas!;
 
         while (f.BarMouse.TryDequeue(out var m))
         {
-            if (m.kind == 0) { f.BarMouseX = m.x; f.BarMouseY = m.y; continue; }
-            int item = bar.HitTest(m.x, m.y);
+            if (m.kind == 0) { f.BarMouseX = m.x < 0 ? -1 : (int)(m.x / vs); f.BarMouseY = (int)(m.y / vs); continue; }
+            int item = bar.HitTest(m.x / vs, m.y / vs);
             switch (m.kind)
             {
                 case 1: f.BarDownItem = item; break;
@@ -378,9 +385,9 @@ internal sealed class Engine
 
         int cols = Math.Max(1, (bw + atlas.CellW - 1) / atlas.CellW), rows = Math.Max(1, (bhh + atlas.CellH - 1) / atlas.CellH);
         f.BarGrid.Resize(cols, rows);
-        bar.Layout(bw, bhh, atlas.CellW, atlas.CellH, barR.Canvas);
+        bar.Layout(vs == 1 ? bw : (int)MathF.Round(bw / vs), vs == 1 ? bhh : (int)MathF.Round(bhh / vs), atlas.CellW, atlas.CellH, barR.Canvas);
         bar.PaintCells(f.BarGrid);
-        barR.Draw(f.BarGrid, BarEffects(bar, comp), (float)f.Time, bar.ClearColor, null, bar.PaintVector);
+        barR.Draw(f.BarGrid, BarEffects(bar, comp), (float)f.Time, bar.ClearColor, null, ScaledBy(vs, bar.PaintVector));
         if (!barR.Present()) { barR.Dispose(); f.BarR = null; }
     }
 
@@ -408,7 +415,8 @@ internal sealed class Engine
             lGen = g; lastLSig = "";
         }
         if (comp.Generation != lCompGen) { lr.Canvas.Reset(); lCompGen = comp.Generation; lastLSig = ""; }
-        var font = comp.Theme.Options.Font;
+        float ls = L.Scale, lvs = comp.Theme.Smooth ? ls : 1;
+        var font = Screens.Scaled(comp.Theme.Options.Font, ls);
         if (font.Key != lFontKey) { lr.SetFont(font); lFontKey = font.Key; lastLSig = ""; }
         var st = L.State;
         var sig = st.Signature + "|" + w + "x" + h;
@@ -418,11 +426,18 @@ internal sealed class Engine
         var scene = L.Scene;
         lGrid.Resize(Math.Max(1, w / atlas.CellW), Math.Max(1, h / atlas.CellH));
         scene.PaintCells(lGrid, st, atlas.CellW, atlas.CellH);
-        lr.Draw(lGrid, new EffectSettings { Enabled = false }, 0, new Rgba(0, 0, 0, 0), null, c => scene.PaintVector(c, st, w));
+        lr.Draw(lGrid, new EffectSettings { Enabled = false }, 0, new Rgba(0, 0, 0, 0), null, ScaledBy(lvs, c => scene.PaintVector(c, st, (int)MathF.Round(w / lvs))));
         if (!lr.Present()) { lr.Dispose(); lr = null; return true; }
-        L.Drawn(scene.ContentHeight);
+        L.Drawn(scene.ContentHeight * lvs);
         return true;
     }
+
+    static Action<Canvas> ScaledBy(float s, Action<Canvas> draw) => Math.Abs(s - 1) < 0.001f ? draw : c =>
+    {
+        var t0 = c.Dc.Transform;
+        c.Dc.Transform = System.Numerics.Matrix3x2.CreateScale(s) * t0;
+        try { draw(c); } finally { c.Dc.Transform = t0; }
+    };
 
     [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern uint WaitForMultipleObjects(uint n, IntPtr[] handles, bool all, uint ms);
 

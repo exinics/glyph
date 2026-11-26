@@ -39,6 +39,9 @@ internal sealed class LauncherHost : NativeWindow, IDisposable, IMessageFilter
     }
 
     public bool Visible => wanted;
+    /// The display scale where it opened (1 = 100%); smooth themes draw it scaled by this.
+    public volatile float Scale = 1;
+    float VScale => Scene.Theme.Smooth ? Scale : 1;
     public LauncherState State => state;
     public (IntPtr hwnd, int gen, int w, int h, bool want) Surface() { lock (gate) return (Handle, generation, width, height, wanted); }
 
@@ -49,7 +52,8 @@ internal sealed class LauncherHost : NativeWindow, IDisposable, IMessageFilter
         var look = Scene.O;
         Search.Refresh();
         var area = Screen.FromPoint(Cursor.Position).WorkingArea;
-        int w = Math.Min(look.Width, area.Width - 40);
+        Scale = Glyph.Desktop.Screens.Use(Glyph.Desktop.Screens.ScaleAt(Cursor.Position.X, Cursor.Position.Y));
+        int w = Math.Min((int)(look.Width * Scale), area.Width - 40);
         lock (gate) { width = w; generation++; }
         int x = area.X + (area.Width - w) / 2, y = area.Y + (int)(area.Height * look.Top);
         SetWindowPos(Handle, (IntPtr)(-1), x, y, w, height, 0x0010 /* NOACTIVATE */);
@@ -156,7 +160,8 @@ internal sealed class LauncherHost : NativeWindow, IDisposable, IMessageFilter
     int RowAt(int x, int y)
     {
         var rects = Scene.RowRects;
-        for (int i = 0; i < rects.Length; i++) if (rects[i].Contains(x, y)) return state.Top + i;
+        float vs = VScale;
+        for (int i = 0; i < rects.Length; i++) if (rects[i].Contains(x / vs, y / vs)) return state.Top + i;
         return -1;
     }
 
@@ -204,7 +209,7 @@ internal sealed class LauncherHost : NativeWindow, IDisposable, IMessageFilter
                 {
                     int row = RowAt(X(m), Y(m));
                     if (row >= 0) Activate(row, false);
-                    else if (Y(m) > Scene.ContentHeight) Hide();   // the see-through part under it
+                    else if (Y(m) > Scene.ContentHeight * VScale) Hide();   // the see-through part under it
                     return;
                 }
             case 0x020A:   // WM_MOUSEWHEEL

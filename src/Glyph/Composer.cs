@@ -18,6 +18,10 @@ internal sealed class Composer : IDisposable
     public readonly Grid Grid = new();
     readonly Frame frame = new();
     public readonly WidgetEnv Env = new();
+    /// Display scale (1 = 100%). Smooth themes lay out and draw widgets in pixels ÷ this, drawn scaled up;
+    /// terminal themes use a bigger font instead (set by the engine).
+    public float Scale = 1;
+    float VS => Theme.Smooth ? Scale : 1;
     public int Generation;          // bumps on every load (so caches know to refresh)
 
     public FontOptions Font => Theme.Options.Font;
@@ -75,6 +79,7 @@ internal sealed class Composer : IDisposable
     public void AddTrail(float x, float y)
     {
         if (!I.Trail) return;
+        x /= VS; y /= VS;
         trail.Add((x, y, lastTime));
         if (trail.Count > 400) trail.RemoveAt(0);
     }
@@ -82,6 +87,7 @@ internal sealed class Composer : IDisposable
     /// The mouse wheel over empty desktop.
     public void Wheel(float x, float y, int delta)
     {
+        x /= VS; y /= VS;
         foreach (var w in Widgets) if (w.Bounds.Contains(x, y)) { w.Wheel(x, y, delta, Env); return; }
         var a = delta > 0 ? I.OnScrollUp : I.OnScrollDown;
         if (a.Length > 0) BackgroundAction?.Invoke(a);
@@ -147,18 +153,21 @@ internal sealed class Composer : IDisposable
 
     public void Compose(int pxW, int pxH, int cellW, int cellH, float time, float dt, float cursorPxX, float cursorPxY, RectangleF? area = null)
     {
-        Env.Area = area ?? new RectangleF(0, 0, pxW, pxH);
+        float vs = VS;
+        var a = area ?? new RectangleF(0, 0, pxW, pxH);
+        Env.Area = new RectangleF(a.X / vs, a.Y / vs, a.Width / vs, a.Height / vs);
         int cols = Math.Max(1, (pxW + cellW - 1) / cellW), rows = Math.Max(1, (pxH + cellH - 1) / cellH);
         Grid.Resize(cols, rows);
         frame.Grid = Grid; frame.Theme = Theme; frame.Time = time; frame.Dt = dt;
         frame.Aspect = cellH / (float)cellW;
         frame.CursorX = cursorPxX / cellW; frame.CursorY = cursorPxY / cellH;
-        Env.W = pxW; Env.H = pxH; Env.CellW = cellW; Env.CellH = cellH; Env.Theme = Theme; Env.Time = time;
+        Env.W = (int)(pxW / vs); Env.H = (int)(pxH / vs); Env.CellW = cellW; Env.CellH = cellH; Env.Theme = Theme; Env.Time = time;
         SetupPainter(cellW, cellH);
         lastTime = time;
         Scene.Draw(frame);
         DrawInteractionCells();
         foreach (var w in Widgets) { w.Layout(Env); w.DrawCells(Grid, Env); }
+        DrawSelectionCells();
         DrawProblems();
     }
 
@@ -179,6 +188,16 @@ internal sealed class Composer : IDisposable
         return sb.ToString();
     }
 
+    /// Wraps a smooth drawing step so it's drawn at the display's scale.
+    public Action<Canvas> Scaled(Action<Canvas> draw) => c =>
+    {
+        float vs = VS;
+        if (Math.Abs(vs - 1) < 0.001f) { draw(c); return; }
+        var t0 = c.Dc.Transform;
+        c.Dc.Transform = System.Numerics.Matrix3x2.CreateScale(vs) * t0;
+        try { draw(c); } finally { c.Dc.Transform = t0; }
+    };
+
     /// Backdrop gradient or picture (a solid colour is just the clear colour).
     public void DrawBackdrop(Canvas c)
     {
@@ -195,6 +214,7 @@ internal sealed class Composer : IDisposable
         DrawInteractionVector(c);
         if (Theme.Smooth) DrawLinks(c);
         foreach (var w in Widgets) w.DrawVector(c, Env);
+        DrawSelectionVector(c);
     }
 
     /// Lines from a panel to the panel named in its Link to (drawn under the panels).
@@ -264,6 +284,7 @@ internal sealed class Composer : IDisposable
     /// Updates which item is under the mouse. Returns true if that changed (needs a redraw).
     public bool UpdateHover(float x, float y, bool overDesktop)
     {
+        x /= VS; y /= VS;
         bool changed = false;
         foreach (var w in Widgets)
         {
@@ -275,8 +296,11 @@ internal sealed class Composer : IDisposable
 
     public void MouseDown(float x, float y)
     {
+        x /= VS; y /= VS;
         downWidget = null; downItem = -1;
         bgDown = Widgets.Any(w => w.Bounds.Contains(x, y)) ? new PointF(-1e6f, -1e6f) : new PointF(x, y);
+        selFrom = bgDown.X > -1e5f && I.SelectBox && App.HideDesktopIcons ? bgDown : null;
+        selecting = false;
         foreach (var w in Widgets)
         {
             int h = w.HitTest(x, y);
@@ -286,8 +310,55 @@ internal sealed class Composer : IDisposable
 
     PointF bgDown = new(-1e6f, -1e6f); long lastBgClick; PointF lastBgPt;
 
+    // ---------------- the selection box (dragging on empty desktop) ----------------
+    PointF? selFrom; PointF selTo; bool selecting;
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
+    public bool Selecting => selecting;
+
+    /// The mouse moved (screen pixels relative to this desktop). Returns true if the selection box changed.
+    public bool DragTo(float x, float y)
+    {
+        if (selFrom is not PointF from) return false;
+        x /= VS; y /= VS;
+        if ((GetAsyncKeyState(0x01) & 0x8000) == 0) { selFrom = null; bool was = selecting; selecting = false; return was; }   // let go somewhere we didn't see
+        if (!selecting && Math.Abs(x - from.X) + Math.Abs(y - from.Y) < 5) return false;
+        selecting = true; selTo = new PointF(x, y);
+        return true;
+    }
+
+    RectangleF SelRect() { var a = selFrom ?? selTo; return RectangleF.FromLTRB(Math.Min(a.X, selTo.X), Math.Min(a.Y, selTo.Y), Math.Max(a.X, selTo.X), Math.Max(a.Y, selTo.Y)); }
+
+    void DrawSelectionVector(Canvas c)
+    {
+        if (!selecting) return;
+        var r = SelRect();
+        if (Theme.Frame(I.SelectFrame) is { } f) { Glyph.Render.FramePainter.Draw(c, f, Theme, r, "", "", Env.BaseFontSize); return; }
+        c.Fill(r, Theme[I.SelectColor], 0, I.SelectOpacity);
+        c.Stroke(r, Theme[I.SelectBorder], I.SelectBorderWidth);
+    }
+
+    void DrawSelectionCells()
+    {
+        if (!selecting || Theme.Smooth) return;
+        var r = SelRect();
+        int x0 = (int)(r.Left / Env.CellW), y0 = (int)(r.Top / Env.CellH), x1 = (int)(r.Right / Env.CellW), y1 = (int)(r.Bottom / Env.CellH);
+        int w = Math.Max(1, x1 - x0 + 1), h = Math.Max(1, y1 - y0 + 1);
+        for (int y = y0; y < y0 + h; y++)
+            for (int x = x0; x < x0 + w; x++)
+            {
+                if (x < 0 || y < 0 || x >= Grid.W || y >= Grid.H) continue;
+                int i = y * Grid.W + x;
+                Grid.Bg[i] = Px.Over(Grid.Bg[i], Px.Alpha(Theme[I.SelectColor].Packed, I.SelectOpacity));
+            }
+        if (I.SelectBorderWidth > 0 && w >= 2 && h >= 2) Grid.Box(x0, y0, w, h, Theme[I.SelectBorder].Packed);
+    }
+
     public void MouseUp(float x, float y)
     {
+        x /= VS; y /= VS;
+        bool wasSelecting = selecting;
+        selFrom = null; selecting = false;
+        if (wasSelecting) { downWidget = null; return; }
         if (downWidget == null)
         {
             if (Math.Abs(x - bgDown.X) > 6 || Math.Abs(y - bgDown.Y) > 6) return;

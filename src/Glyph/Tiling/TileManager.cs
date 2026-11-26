@@ -27,9 +27,9 @@ internal sealed class TilingOptions
     public string InactiveBorder { get; set; } = "none";
     [Description("Window corners while tiling: keep = Windows' rounding, square, round, small."), Choices("keep", "square", "round", "small"), TypeConverter(typeof(ChoicesConverter))]
     public string Corners { get; set; } = "keep";
-    [DisplayName("Float these"), Description("Windows that stay where you put them instead of being tiled. Each line matches class:Name, process:name.exe, title:Text, or just text in the title. * matches anything, e.g. title:*Picture-in-Picture*.")]
+    [DisplayName("Float these"), TypeConverter(typeof(ListConverter)), Description("Windows that stay where you put them instead of being tiled. Each line matches class:Name, process:name.exe, title:Text, or just text in the title. * matches anything, e.g. title:*Picture-in-Picture*.")]
     public string[] Float { get; set; } = { "class:#32770", "class:OperationStatusWindow", "title:*Picture-in-Picture*", "title:*Picture in picture*", "process:PowerToys*" };
-    [DisplayName("Ignore these"), Description("Windows tiling never touches at all (no border either). Same patterns as Float these.")]
+    [DisplayName("Ignore these"), TypeConverter(typeof(ListConverter)), Description("Windows tiling never touches at all (no border either). Same patterns as Float these.")]
     public string[] Ignore { get; set; } = Array.Empty<string>();
 }
 
@@ -265,7 +265,7 @@ internal sealed class TileManager : IDisposable
             var area = Rectangle.FromLTRB(w.Left + o.OuterGap, w.Top + o.OuterGap, w.Right - o.OuterGap, w.Bottom - o.OuterGap);
             var list = mon.ToList();
             var rects = Layout(LayoutOf(mon.Key), list.Count, area, RatioOf(mon.Key), o.Gap);
-            if (Glyph.Desktop.WindowFrames.Room is { } room)   // leave space for window frames (a title tab above, a border…)
+            if (Glyph.Desktop.WindowFrames.RoomFor(mon.Key) is { } room)   // leave space for window frames (a title tab above, a border…)
                 rects = rects.Select(r => Rectangle.FromLTRB(r.Left + room.l, r.Top + room.t, r.Right - room.r, r.Bottom - room.b)).ToList();
             for (int i = 0; i < list.Count; i++) { Place(list[i], rects[i]); placed[list[i]] = rects[i]; }
             placedAt = Environment.TickCount64;

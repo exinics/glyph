@@ -34,10 +34,10 @@ internal sealed partial class SettingsForm
     Control BuildDesign()
     {
         var root = new Panel { Dock = DockStyle.Fill };
-        var tools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 46, WrapContents = false, Padding = new Padding(0, 4, 0, 0) };
+        var tools = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true, Padding = new Padding(0, 4, 0, 4) };
         Button T(string text, Action a, bool primary = false)
         {
-            var b = new Button { Text = text, AutoSize = true, Height = 34, Padding = new Padding(8, 0, 8, 0), Margin = new Padding(0, 0, 6, 0) };
+            var b = new Button { Text = text, AutoSize = true, Height = 34, Padding = new Padding(8, 0, 8, 0), Margin = new Padding(0, 0, 6, 6) };
             b.Click += (_, _) => a(); tools.Controls.Add(b);
             if (primary) b.HandleCreated += (_, _) => Dark.Primary(b);
             return b;
