@@ -120,8 +120,8 @@ change appears within about a second.
 1. Install the .NET 9 desktop runtime once: `winget install Microsoft.DotNet.DesktopRuntime.9`
    (and ffmpeg for videos and the converter: `winget install Gyan.FFmpeg.Essentials`).
 2. Download `Glyph-win-x64.zip` from the newest release on GitHub (github.com/exinics/glyph/releases),
-   unzip it anywhere you like (e.g. `C:\Glyph`) and run `Glyph\bin\Glyph.exe`. The first start makes the example
-   themes (and the **operator** theme) and imports your desktop shortcuts into `Glyph\config`.
+   unzip it anywhere you like (e.g. `C:\Glyph`) and run `Glyph\bin\Glyph.exe`. The first start sets up the **operator**
+   theme and imports your desktop shortcuts into `Glyph\config`.
 3. Settings > General > *Start with Windows* to have it start by itself.
 
 **Updates** (General > Updates): `auto` looks on GitHub 30 seconds after Glyph starts and every 6 hours, downloads a
@@ -136,7 +136,7 @@ Updates only replace `bin\`: your `config` folder (settings, themes, shortcuts) 
 |---|---|
 | **Design** | A live preview of the theme you're editing. Click a widget, the bar, a bar module or the background to change it on the right; drag widgets to move them, drag the corner square to resize, and *Draw box ▾* to drag out a new box and choose what's in it. *Animate* lets the wallpaper and mouse effects play. The colour squares at the bottom change the theme's colours. *Pick colour* is an eyedropper: click anywhere on the preview to put that colour in the palette (as the accent with matching shades, or any colour). *Wallpaper colours…* finds the wallpaper's main colours and offers an accent or a whole palette made from them. |
 | **Frames** | The theme's box designs (see 6b5), with a live preview. *New frame ▾* starts from a ready-made design. |
-| **Themes** | Your themes. *Use this theme* shows it on the desktop. *New theme…* and *Duplicate…* make a copy to change, so you never break a theme you like. Rename, delete, open the folder, or *Add example themes* to get back the two that came with Glyph. Clicking a theme picks it for editing in the other tabs (the line at the top says which one you're editing). |
+| **Themes** | Your themes. *Use this theme* shows it on the desktop. *New theme…* and *Duplicate…* make a copy to change, so you never break a theme you like. Rename, delete, open the folder, or *Restore the built-in theme* to get operator back as it came. Clicking a theme picks it for editing in the other tabs (the line at the top says which one you're editing). |
 | **Colours & look** | The **palette** (every colour in the theme; double-click to change one, or type a hex code) and the theme's options: its **style**, the **character font**, the **smooth style** (panel colour and see-through-ness, corner roundness, border, shadow, font) and the **screen effects** (glow, scanlines…). |
 | **Wallpaper** | The **backdrop** (a colour, a gradient or a picture), the **mouse effect**, and the **layers**: add, remove, duplicate and reorder them, and change the selected one below. |
 | **Shortcuts** | Your shortcuts (shared by every theme). Add programs, files, folders or websites, *Import desktop icons*, reorder them, give one *your own picture*, or go back to the app's icon. Also: *Hide Windows' own desktop icons*. |
@@ -172,8 +172,9 @@ the shared `art\`, `clips\`, `images\` and `icons\` folders here.
 the last), *mono* (a flat silhouette in one colour) and *ascii* (drawn with characters). Your own
 picture for a shortcut is styled the same way, so it always fits the theme.
 
-**The two example themes:** `red-mono` (terminal: black and white with red, CRT glow) and `soft`
-(smooth: gradient backdrop, rounded panels; nothing moves, so it uses almost no power).
+**The built-in theme:** `operator` (smooth: a dark navy HUD with teal lines, cut-corner panels, hex feeds, a framed
+bar, a framed launcher and window frames). It's set up the first time Glyph starts; make your own from it with
+*Duplicate…*. Updates never change your themes.
 
 ## 4. Colours
 
@@ -185,29 +186,10 @@ hex code recolours everything that uses it. Where an option asks for a colour yo
 - `none`: fully transparent
 - for a gradient, a list from faint/dark to strong/bright: `bg, accent_dim, accent, bright`
 
-### red-mono palette
+### operator palette (the built-in theme)
 
-| Name | Hex | Used for |
-|---|---|---|
-| `bg` | `#0A0A0A` | background (near-black) |
-| `surface` | `#141414` | panels, the problems box |
-| `line` | `#2A2A2A` | borders, very dim characters |
-| `dim` | `#8A8A8A` | secondary text |
-| `text` | `#E6E6E6` | main text (off-white) |
-| `bright` | `#FFFFFF` | highlights, the brightest characters |
-| `accent` | `#E0202F` | the red |
-| `accent_dim` | `#6E0E16` | dark red |
-| `accent_bright` | `#FF4D57` | bright red: hover, alerts, the mouse glow |
-
-Terminal colours: black `#0A0A0A` · red `#E0202F` · green `#A3B8A0` · yellow `#D9C9A3` · blue `#8E9BB0` ·
-magenta `#C97A86` · cyan `#9FB5B5` · white `#E6E6E6` · bright_black `#5A5A5A` · bright_red `#FF4D57` ·
-bright_green `#BFD1BC` · bright_yellow `#EDE0C2` · bright_blue `#AEB9CB` · bright_magenta `#E39BA6` ·
-bright_cyan `#BDD0D0` · bright_white `#FFFFFF`
-
-### soft palette
-
-bg `#14171C` · surface `#1E232B` · line `#2D3440` · dim `#8C96A5` · text `#E7EBF0` · bright `#FFFFFF` ·
-accent `#6FA8DC` · accent_dim `#2F4A63` · accent_bright `#9CC7F0` · glow `#232B3A`
+bg `#060C12` · surface `#0A1620` · line `#173039` · dim `#4C6B74` · text `#9DBBC0` · bright `#E4F2F2` ·
+accent `#5DB4BC` · accent_dim `#1F4A51` · accent_bright `#93E6EA` · alert `#E5363E` · warn `#E3A847` · glow `#0D2230`
 
 ## 4b. Theme sync: Windows Terminal and Windows colours
 
@@ -486,8 +468,8 @@ be replaced.
 
 - Glyph draws with the graphics card, rests when the desktop can't be seen (fullscreen games,
   maximised windows, lock screen, battery saver) and stops drawing entirely when nothing moves.
-- Measured here: red-mono (animated) about 6% of one CPU core at 30 fps; soft (still) under 1%.
-  About 70 MB of its own memory.
+- Measured here: operator about 2% of one CPU core (its feeds and meters keep changing), about 77 MB of its own
+  memory. A theme where nothing moves uses under 1%.
 - To save more: lower the wallpaper's frames per second, lower *update fps* on noise layers, or use fewer layers.
 
 ## 10. If something's wrong

@@ -424,7 +424,7 @@ internal sealed partial class SettingsForm : Form
         B("Rename…", RenameTheme);
         B("Delete", DeleteTheme);
         B("Open theme folder", () => Open(Paths.ThemeDir(themeName)));
-        B("Add example themes", AddExamples);
+        B("Restore the built-in theme", AddExamples);
         buttons.Controls.Add(new Label
         {
             AutoSize = false, Width = 600, Height = 170, ForeColor = Dark.Dim,
@@ -531,7 +531,8 @@ internal sealed partial class SettingsForm : Form
     void AddExamples()
     {
         var existing = DefaultThemes.Names.Where(n => Directory.Exists(Paths.ThemeDir(n))).ToList();
-        if (existing.Count > 0 && MessageBox.Show(this, $"This resets {string.Join(" and ", existing)} to how they came. Continue?", "Glyph", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+        if (DefaultThemes.Names.Length == 0) { MessageBox.Show(this, "There's no built-in theme next to Glyph.exe (bin\\themes).", "Glyph"); return; }
+        if (existing.Count > 0 && MessageBox.Show(this, $"This resets {string.Join(" and ", existing)} to how it came with Glyph. Continue?", "Glyph", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
         SaveNow();
         dirtyTheme = dirtyWallpaper = dirtyWidgets = dirtyBar = false;
         foreach (var n in DefaultThemes.Names) DefaultThemes.Write(n);

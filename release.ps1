@@ -21,7 +21,6 @@ $out = "$root\out"
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 dotnet publish $proj -c Release -o "$out\Glyph\bin" --nologo -v q
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
-if (Test-Path "$root\themes") { Copy-Item "$root\themes" "$out\Glyph\bin\themes" -Recurse }
 New-Item -ItemType Directory -Force "$out\Glyph\config" | Out-Null
 Set-Content "$out\Glyph\config\README.txt" "Your settings, themes and shortcuts live in this folder. Updates never change it." -Encoding UTF8
 $env:GLYPH_HOME = $root   # so the new build writes the guide into this folder, not into out\

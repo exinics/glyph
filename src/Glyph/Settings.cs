@@ -8,7 +8,7 @@ namespace Glyph;
 internal sealed class AppSettings
 {
     [Browsable(false), Description("Which theme folder in config\\themes is shown")]
-    public string Theme { get; set; } = "red-mono";
+    public string Theme { get; set; } = DefaultThemes.Main;
 
     [Category("Glyph"), DisplayName("Start with Windows"), Description("Start Glyph when you sign in.")]
     public bool StartWithWindows { get; set; }

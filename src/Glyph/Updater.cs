@@ -146,33 +146,6 @@ internal static class Updater
         }
     }
 
-    /// Themes that come with Glyph (bin\themes) are copied into config\themes once, the first time they're seen.
-    public static void InstallShippedThemes()
-    {
-        var src = Path.Combine(AppContext.BaseDirectory, "themes");
-        if (!Directory.Exists(src)) return;
-        Directory.CreateDirectory(Paths.Themes);
-        var marker = Path.Combine(Paths.Themes, ".shipped");
-        var done = File.Exists(marker) ? File.ReadAllLines(marker).ToHashSet(StringComparer.OrdinalIgnoreCase) : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        bool changed = false;
-        foreach (var d in Directory.GetDirectories(src))
-        {
-            var name = Path.GetFileName(d);
-            if (done.Contains(name)) continue;   // installed before: if you deleted it, it stays deleted
-            var to = Paths.ThemeDir(name);
-            if (!Directory.Exists(to)) Copy(d, to);
-            done.Add(name); changed = true;
-        }
-        if (changed) File.WriteAllLines(marker, done);
-
-        static void Copy(string from, string to)
-        {
-            Directory.CreateDirectory(to);
-            foreach (var f in Directory.GetFiles(from)) File.Copy(f, Path.Combine(to, Path.GetFileName(f)), false);
-            foreach (var d in Directory.GetDirectories(from)) Copy(d, Path.Combine(to, Path.GetFileName(d)));
-        }
-    }
-
     /// The app's icon (the G), at about `size` pixels.
     public static Icon AppIcon(int size)
     {

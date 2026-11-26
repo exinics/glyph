@@ -18,7 +18,8 @@ a settings window, and a video→ASCII converter.
 - `powershell -File release.ps1 [-Version 1.2.0] [-Notes "..."]` bumps the version in `Glyph.csproj`, builds
   `out\Glyph-win-x64.zip` (`Glyph\bin\` with `themes\` inside, plus an empty `Glyph\config\`), commits, tags,
   pushes and creates the GitHub release every Glyph updates from (`Updater.cs`).
-- `themes\` holds themes that ship with Glyph (copied into `config\themes` once, the first time a build sees them).
+- `themes\` holds the theme that ships with Glyph (operator). The build puts it in `bin\themes`; it's copied into
+  `config\themes` only when there are no themes yet (first run). Updates never touch themes.
   `config\` itself is personal and not in git (only `config\GUIDE.md` is).
 
 ## Layout
@@ -26,7 +27,7 @@ a settings window, and a video→ASCII converter.
 ```
 Glyph\
   bin\                 built program (Glyph.exe); made by build.ps1 (not in git)
-  themes\              themes that ship with Glyph (copied into config\themes once)
+  themes\              the theme that ships with Glyph (operator); copied into config\themes on first run only
   config\              everything the user edits (TOML, hot-reloaded)
     glyph.toml           app settings (active theme, startup, performance, hide desktop icons)
     shortcuts.toml       shortcuts, shared by all themes
@@ -47,7 +48,7 @@ Glyph\
   `--finish-update <bin> <pid>` (waits for Glyph to close, copies itself over `bin\`, restarts it). `--update [--no-start]`
   does the same from a terminal.
 - Also: `--snapshot out.png [--seconds N] [--size WxH] [--cursor x,y] [--theme NAME] [--bar]`, `--snapshot-bar out.png`,
-  `--snapshot-launcher out.png [query]`, `--write-guide`, `--reset-example <red-mono|soft>`.
+  `--snapshot-launcher out.png [query]`, `--write-guide`, `--reset-example operator` (puts the built-in theme back).
   Set `GLYPH_HOME` to a folder with its own `config\` to test with other files; `GLYPH_DEBUG=1` logs clicks.
 
 ## How it works

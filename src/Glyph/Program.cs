@@ -11,7 +11,6 @@ internal static class Program
         if (Relaunched(args)) return 0;
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write("crash: " + e.ExceptionObject);
         try { DefaultThemes.EnsureExist(); } catch (Exception e) { Log.Write("first-run setup: " + e.Message); }
-        try { Updater.InstallShippedThemes(); } catch (Exception e) { Log.Write("shipped themes: " + e.Message); }
         try
         {
             if (args.Length > 0 && args[0] == "--snapshot") return Snapshot(args);
