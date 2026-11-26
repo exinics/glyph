@@ -102,6 +102,12 @@ heading_font   = "Bahnschrift"
 top_line       = "//  NETRUNNER.OS  —  RUNNING  稼働中          SLOT {selected:000} / {count:000}"
 bottom_line    = "[入力] SEARCH    [↑↓] NAVIGATE    [実行] LAUNCH    [終了] CLOSE        {count} ENTRIES"
 spacing        = 1.5
+marks          = true
+mark_rules     = ["steam|game|play|epic|roblox|minecraft|modrinth|terraria|stardew|hollow knight|geometry dash|overcooked|resident evil|crafter|airmech|weevils=遊", "spotify|music|audio|sound|recorder|kind:sound|kind:media=音", "settings|bluetooth|control panel|services|task manager|kind:windows=設", "firefox|chrome|edge|browser|kind:web|kind:website=網", "discord|teams|whatsapp|mail|outlook=信", "code|studio|sublime|godot|unity|blender|matlab|git|terminal|powershell|cmd|kind:command=工", "notepad|notes|word|notion|obsidian|anki|excel|pdf=書", "camera|photo|snip|paint|aseprite|libresprite|image=画", "calculator|kind:copy=算", "calendar|clock=暦", "vpn|security|defender=盾", "kind:folder|kind:file|explorer=庫", "kind:theme|kind:glyph|kind:tiling=核"]
+mark_default   = "具"
+mark_frame     = "button"
+mark_color     = "dim"
+mark_selected_color = "accent_bright"
 
 [windows]
 mode           = "focused"

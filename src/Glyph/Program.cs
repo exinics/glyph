@@ -120,7 +120,7 @@ internal static class Program
         comp.Load();
         var scene = new Glyph.Launcher.LauncherScene { Theme = comp.Theme, O = comp.Theme.Options.Launcher };
         var st = new Glyph.Launcher.LauncherState { Query = query, Selected = 0 };
-        foreach (var (t, k) in new[] { ("AntiMicroX", "app"), ("Aseprite", "app"), ("Audio Player", "app"), ("Bluetooth Manager", "app"), ("Calculator", "app"), ("Calendar", "app"), ("Camera", "app"), ("Characters", "app"), ("Downloads", "folder"), ("Theme: soft", "theme"), ("Tiling: on", "glyph") })
+        foreach (var (t, k) in new[] { ("Steam", "app"), ("Aseprite", "app"), ("Spotify", "app"), ("Bluetooth settings", "app"), ("Calculator", "app"), ("Calendar", "app"), ("Visual Studio Code", "app"), ("Firefox", "app"), ("Downloads", "folder"), ("Theme: soft", "theme"), ("Tiling: on", "glyph") })
             st.Results.Add(new Glyph.Launcher.Item(t, t, k, "", ""));
         int w = scene.O.Width + 12, h = 1100;
         using var r = new Renderer(IntPtr.Zero, w, h);

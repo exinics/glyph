@@ -306,7 +306,7 @@ it. What it finds (General > Launcher):
 
 Things you open often come first, and an empty search shows them. Ctrl+Backspace deletes a word, Ctrl+V pastes,
 Ctrl+A clears. The launcher follows the theme (terminal or smooth); its size, colours and prompt are in each
-theme's *Launcher look* (Colours & look page, or `[launcher]` in theme.toml). The Start menu is read by a small
+theme's *Launcher look* (Colours & look page, or `[launcher]` in theme.toml). Its *Frames* options give a framed look (heading, numbered rows in frames, a curve, small type tags); *Mark boxes* put a character at the end of each result, picked by *Mark rules* like `steam|game=遊` or `kind:folder=庫` (the operator theme has a set of kanji). The Start menu is read by a small
 helper program (`Glyph.exe --scan-apps`) that saves the app list and icons in `config\icons\cache`, so the
 Windows code for that never stays in Glyph's memory. Closed for 20 seconds, the launcher gives its memory back.
 
@@ -594,6 +594,12 @@ See 6e.
 | `top_line` | `""` |  | **Top line.** A small line at the very top. {count} = how many results. Empty = none. |
 | `bottom_line` | `""` |  | **Bottom line.** A small line at the bottom, e.g. key hints. {count} = how many results, {selected} = which one is selected. Empty = none. |
 | `spacing` | `0` | -5 to 50 | **Letter spacing.** Extra pixels between letters of the heading, top and bottom lines. |
+| `marks` | `false` | true, false | **Mark boxes.** A small box at the right end of each result with a character showing what kind of thing it is (e.g. 遊 for games, 音 for music). Smooth style. |
+| `mark_rules` | `["kind:folder\|kind:file=▤", "kind:web\|kind:website=◎", "kind:copy=＝", "kind:command=›", "kind:sound\|kind:media=♪", "kind:windows=⊞", "kind:theme\|kind:glyph\|kind:tiling=◆"]` |  | **Mark rules.** Which character each result gets: words=character. The words (split with \|) are looked for in the result's name and what it opens; kind:app, kind:folder, kind:theme… match the kind of result. The first rule that matches wins. E.g. steam\|game\|play=遊, music\|spotify\|audio=音, kind:folder=档. |
+| `mark_default` | `"▪"` |  | **Other results.** The character for results no rule matches. Empty = no box for them. |
+| `mark_frame` | `"auto"` |  | **Mark frame.** A frame (Frames page) for the boxes. auto = the number frame, none = just the character. |
+| `mark_color` | `"dim"` | colour name or hex | **Mark colour.**  |
+| `mark_selected_color` | `"bright"` | colour name or hex | **Selected mark colour.**  |
 
 ### theme.toml [windows] (window frames)
 

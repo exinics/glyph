@@ -399,7 +399,7 @@ it. What it finds (General > Launcher):
 
 Things you open often come first, and an empty search shows them. Ctrl+Backspace deletes a word, Ctrl+V pastes,
 Ctrl+A clears. The launcher follows the theme (terminal or smooth); its size, colours and prompt are in each
-theme's *Launcher look* (Colours & look page, or `[launcher]` in theme.toml). The Start menu is read by a small
+theme's *Launcher look* (Colours & look page, or `[launcher]` in theme.toml). Its *Frames* options give a framed look (heading, numbered rows in frames, a curve, small type tags); *Mark boxes* put a character at the end of each result, picked by *Mark rules* like `steam|game=遊` or `kind:folder=庫` (the operator theme has a set of kanji). The Start menu is read by a small
 helper program (`Glyph.exe --scan-apps`) that saves the app list and icons in `config\icons\cache`, so the
 Windows code for that never stays in Glyph's memory. Closed for 20 seconds, the launcher gives its memory back.
 

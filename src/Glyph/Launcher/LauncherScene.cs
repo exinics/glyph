@@ -40,6 +40,33 @@ internal sealed class LauncherLook
     [Category("Frames"), DisplayName("Top line"), Description("A small line at the very top. {count} = how many results. Empty = none.")] public string TopLine { get; set; } = "";
     [Category("Frames"), DisplayName("Bottom line"), Description("A small line at the bottom, e.g. key hints. {count} = how many results, {selected} = which one is selected. Empty = none.")] public string BottomLine { get; set; } = "";
     [Category("Frames"), DisplayName("Letter spacing"), Description("Extra pixels between letters of the heading, top and bottom lines."), Range(-5, 50)] public float Spacing { get; set; }
+
+    [Category("Marks"), DisplayName("Mark boxes"), Description("A small box at the right end of each result with a character showing what kind of thing it is (e.g. 遊 for games, 音 for music). Smooth style.")] public bool Marks { get; set; }
+    [Category("Marks"), DisplayName("Mark rules"), Description("Which character each result gets: words=character. The words (split with |) are looked for in the result's name and what it opens; kind:app, kind:folder, kind:theme… match the kind of result. The first rule that matches wins. E.g. steam|game|play=遊, music|spotify|audio=音, kind:folder=档."), TypeConverter(typeof(ListConverter))]
+    public string[] MarkRules { get; set; } = { "kind:folder|kind:file=▤", "kind:web|kind:website=◎", "kind:copy=＝", "kind:command=›", "kind:sound|kind:media=♪", "kind:windows=⊞", "kind:theme|kind:glyph|kind:tiling=◆" };
+    [Category("Marks"), DisplayName("Other results"), Description("The character for results no rule matches. Empty = no box for them.")] public string MarkDefault { get; set; } = "▪";
+    [Category("Marks"), DisplayName("Mark frame"), Description("A frame (Frames page) for the boxes. auto = the number frame, none = just the character."), TypeConverter(typeof(FrameNameConverter))] public string MarkFrame { get; set; } = "auto";
+    [Category("Marks"), DisplayName("Mark colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string MarkColor { get; set; } = "dim";
+    [Category("Marks"), DisplayName("Selected mark colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string MarkSelectedColor { get; set; } = "bright";
+
+    /// The character for a result, from the rules (or the default).
+    public string MarkFor(Item it)
+    {
+        foreach (var raw in MarkRules)
+        {
+            int eq = raw.LastIndexOf('=');
+            if (eq <= 0 || eq == raw.Length - 1) continue;
+            var mark = raw[(eq + 1)..].Trim();
+            foreach (var w0 in raw[..eq].Split('|'))
+            {
+                var w = w0.Trim();
+                if (w.Length == 0) continue;
+                if (w.StartsWith("kind:", StringComparison.OrdinalIgnoreCase)) { if (it.Kind.Equals(w[5..], StringComparison.OrdinalIgnoreCase)) return mark; }
+                else if (it.Title.Contains(w, StringComparison.OrdinalIgnoreCase) || it.Action.Contains(w, StringComparison.OrdinalIgnoreCase)) return mark;
+            }
+        }
+        return MarkDefault;
+    }
 }
 
 /// What the launcher shows right now (made on the UI thread, drawn on the render thread).
@@ -65,7 +92,7 @@ internal sealed class LauncherScene
 
     // ───────────── smooth ─────────────
 
-    bool Framed => Theme.Frame(O.Frame) != null || Theme.Frame(O.RowFrame) != null || O.Heading.Length > 0 || O.Numbers || O.TopLine.Length > 0 || O.BottomLine.Length > 0;
+    bool Framed => Theme.Frame(O.Frame) != null || Theme.Frame(O.RowFrame) != null || O.Heading.Length > 0 || O.Numbers || O.TopLine.Length > 0 || O.BottomLine.Length > 0 || O.Marks;
 
     string Line(string fmt, LauncherState st) => Glyph.Data.Fmt.Text(fmt, (n, s) => n switch
     {
@@ -85,6 +112,7 @@ internal sealed class LauncherScene
         var rowF = t.Frame(O.RowFrame);
         var selF = O.SelectedFrame == "auto" ? rowF : t.Frame(O.SelectedFrame);
         var numF = t.Frame(O.NumberFrame);
+        var markF = O.MarkFrame == "auto" ? numF : t.Frame(O.MarkFrame);
         float pad = panelF != null ? (panelF.Padding >= 0 ? panelF.Padding : ui.Padding) : ui.Padding;
         float small = fs * 0.78f, lineH = small * 1.6f;
         float headSize = fs * 2.0f, headH = O.Heading.Length > 0 ? headSize * 1.35f : 0;
@@ -166,18 +194,30 @@ internal sealed class LauncherScene
                 cx += isz + fs * 0.7f;
             }
             float kw = c.Measure(it.Kind.ToUpperInvariant(), font, small * 0.85f, false);
+            // the mark box at the right end (e.g. 遊 for games)
+            float rightEdge = row.Right - inner;
+            var mark = O.Marks ? O.MarkFor(it) : "";
+            if (mark.Length > 0)
+            {
+                float ms = Math.Min(rowH * 0.56f, fs * 1.7f);
+                var mr = new RectangleF(rightEdge - ms + 2, y + (rowH - ms) / 2, ms, ms);
+                if (markF != null) FramePainter.Draw(c, markF, t, mr, "", "", fs, sel);
+                float msz = ms * 0.62f;
+                c.Text(mark, new RectangleF(mr.X - 2, mr.Y + (ms - msz * 1.36f) / 2, ms + 4, msz * 1.5f), sel ? t[O.MarkSelectedColor] : t[O.MarkColor], font, msz, false, "center");
+                rightEdge = mr.X - fs * 0.6f;
+            }
             if (O.KindBelow)
             {
                 float ty = y + rowH * 0.12f;
-                Title(c, it, cx, ty, row.Right - inner - cx, fs, sel, font);
+                Title(c, it, cx, ty, rightEdge - cx, fs, sel, font);
                 var kr = new RectangleF(cx, ty + fs * 1.42f, kw + 8, small * 1.2f);
                 c.Stroke(kr, sel ? acc : t[O.BorderColor], 1);
                 c.Text(it.Kind.ToUpperInvariant(), new RectangleF(kr.X + 4, kr.Y + (kr.Height - small * 0.85f * 1.36f) / 2, kw + 4, small * 1.3f), sel ? acc : dim, font, small * 0.85f);
             }
             else
             {
-                c.Text(it.Kind, new RectangleF(row.Right - kw - inner, y + (rowH - small * 1.36f) / 2, kw + 4, small * 1.5f), dim, font, small * 0.85f);
-                Title(c, it, cx, y + (rowH - fs * 1.36f) / 2, row.Right - kw - inner * 2 - cx, fs, sel, font);
+                c.Text(it.Kind, new RectangleF(rightEdge - kw, y + (rowH - small * 1.36f) / 2, kw + 4, small * 1.5f), dim, font, small * 0.85f);
+                Title(c, it, cx, y + (rowH - fs * 1.36f) / 2, rightEdge - kw - inner - cx, fs, sel, font);
             }
             y += rowH + gap;
         }
