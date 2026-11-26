@@ -1,0 +1,12 @@
+# built files
+bin/
+obj/
+out/
+*.zip
+.vs/
+# personal: settings, shortcuts, converted clips, icon cache, logs
+config/*
+!config/GUIDE.md
+config-backup-v1/
+logs/
+*.lnk

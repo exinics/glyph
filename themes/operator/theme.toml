@@ -1,0 +1,111 @@
+# Theme "operator": a dark navy HUD with teal lines, cut-corner panels and live readouts.
+
+[palette]
+bg            = "#060C12"
+surface       = "#0A1620"
+line          = "#173039"
+dim           = "#4C6B74"
+text          = "#9DBBC0"
+bright        = "#E4F2F2"
+accent        = "#5DB4BC"
+accent_dim    = "#1F4A51"
+accent_bright = "#93E6EA"
+alert         = "#E5363E"
+warn          = "#E3A847"
+glow          = "#0D2230"
+
+[terminal]
+black          = "#060C12"
+red            = "#E5363E"
+green          = "#4FC27E"
+yellow         = "#E3C547"
+blue           = "#4A8FD0"
+magenta        = "#E8457A"
+cyan           = "#5DB4BC"
+white          = "#9DBBC0"
+bright_black   = "#4C6B74"
+bright_red     = "#FF5A61"
+bright_green   = "#7BE0A2"
+bright_yellow  = "#F3DB76"
+bright_blue    = "#78B4EC"
+bright_magenta = "#FF6E9C"
+bright_cyan    = "#93E6EA"
+bright_white   = "#E4F2F2"
+
+[info]
+description = "Dark navy HUD: teal lines, cut-corner panels with title strips and corner brackets, live hex feeds, a framed bar and terminal frames"
+style       = "smooth"
+
+[font]
+font      = "Cascadia Mono"
+font_size = 14
+
+[ui]
+font          = "Cascadia Mono"
+font_size     = 12
+bold_titles   = true
+corner_radius = 0
+panel_color   = "surface"
+panel_opacity = 0.8
+border_color  = "accent_dim"
+border_width  = 1
+shadow        = 0
+text_color    = "text"
+accent_color  = "accent"
+padding       = 10
+panel_frame   = "panel"
+button_frame  = "button"
+
+[effects]
+enabled = false
+
+[sync]
+terminal            = true
+terminal_background = "bg"
+terminal_text       = "text"
+terminal_cursor     = "accent"
+terminal_selection  = "accent_dim"
+terminal_tab_bar    = "bg"
+terminal_font       = "Cascadia Mono"
+terminal_crt        = "off"
+accent              = true
+accent_color        = "accent"
+accent_light        = "accent_bright"
+accent_dark         = "accent_dim"
+dark_mode           = "dark"
+
+[launcher]
+width          = 600
+max_results    = 11
+top            = 0.2
+scale          = 1.05
+prompt         = "›"
+placeholder    = "SEARCH_"
+background     = "bg"
+border_color   = "line"
+text_color     = "text"
+dim_color      = "dim"
+accent_color   = "accent"
+selected_color = "accent_dim"
+selected_text  = "bright"
+frame          = "launcher"
+row_frame      = "row"
+selected_frame = "row_selected"
+row_gap        = 5
+numbers        = true
+number_frame   = "button"
+curve          = 18
+kind_below     = true
+heading        = "APPS"
+heading_note   = "アプリ"
+heading_font   = "Bahnschrift"
+top_line       = "//  NETRUNNER.OS  —  RUNNING  稼働中          SLOT {selected:000} / {count:000}"
+bottom_line    = "[入力] SEARCH    [↑↓] NAVIGATE    [実行] LAUNCH    [終了] CLOSE        {count} ENTRIES"
+spacing        = 1.5
+
+[windows]
+mode           = "focused"
+frame          = "window"
+inactive_frame = "window_idle"
+title          = "{process|map:WindowsTerminal=TTY,firefox=NET,Code=DEV,explorer=FS,Notepad=TXT,Discord=COMMS|upper|max:8}.{n:00}"
+gap            = 3

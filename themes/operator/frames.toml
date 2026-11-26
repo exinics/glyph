@@ -1,0 +1,223 @@
+# Frames: named box designs for panels, bar modules, buttons, the launcher and windows.
+# Easiest to change in the settings window (Frames page, with a live preview).
+
+# every panel (ui.panel_frame)
+[[frame]]
+name = "panel"
+padding = 10
+fill = "surface"
+fill_opacity = 0.78
+border = "accent_dim"
+header = "line"
+title_color = "accent"
+title_size = 11
+title_upper = true
+title_spacing = 1.5
+cut_bottom_right = 10
+
+# the hex readout on the left: title above the box
+[[frame]]
+name = "core"
+padding = 10
+fill = "surface"
+fill_opacity = 0.7
+border = "accent_dim"
+header = "above"
+header_line = "accent_dim"
+title_color = "dim"
+title_size = 10.5
+title_bold = false
+title_upper = true
+title_spacing = 1.5
+pattern = "scanlines"
+pattern_color = "glow"
+pattern_opacity = 0.6
+pattern_spacing = 3
+
+# trace panels on the right: title strip, corner brackets
+[[frame]]
+name = "trace"
+padding = 8
+fill = "surface"
+fill_opacity = 0.72
+border = "accent_dim"
+header = "bar"
+header_fill = "accent_dim"
+header_opacity = 0.45
+header_line = "accent_dim"
+header_height = 22
+title_color = "accent_bright"
+title_right_color = "accent"
+title_size = 10.5
+title_upper = true
+title_spacing = 1.2
+brackets = "accent"
+bracket_length = 7
+bracket_width = 1.5
+bracket_offset = 2
+
+# the media panel
+[[frame]]
+name = "radio"
+padding = 10
+fill = "surface"
+fill_opacity = 0.82
+border = "accent_dim"
+header = "bar"
+header_fill = "accent_dim"
+header_opacity = 0.45
+header_line = "accent_dim"
+header_height = 22
+title_color = "accent_bright"
+title_right_color = "accent"
+title_size = 10.5
+title_upper = true
+title_spacing = 1.5
+brackets = "accent"
+bracket_corners = "top_left_bottom_right"
+bracket_length = 9
+bracket_width = 1.5
+bracket_offset = 2
+
+# the filled callout tag (OPERATOR)
+[[frame]]
+name = "tag"
+padding = 8
+padding_x = 12
+fill = "accent"
+fill_opacity = 0.92
+border = "accent_bright"
+border_opacity = 0.6
+header = "plain"
+title_color = "bg"
+title_font = "Bahnschrift"
+title_size = 15
+title_upper = true
+title_spacing = 2
+cut_bottom_right = 8
+
+# small square buttons (media controls)
+[[frame]]
+name = "button"
+padding = 2
+fill = "bg"
+fill_opacity = 0.6
+border = "accent_dim"
+hover_fill = "accent_dim"
+header = "none"
+
+# bar modules
+[[frame]]
+name = "module"
+padding = 0
+fill = "surface"
+fill_opacity = 0.92
+border = "line"
+border_opacity = 1
+hover_fill = "glow"
+header = "none"
+cut_bottom_left = 5
+
+# the logo box at the left of the bar
+[[frame]]
+name = "logo"
+padding = 0
+fill = "accent_dim"
+fill_opacity = 0.55
+border = "accent"
+hover_fill = "accent_dim"
+header = "none"
+cut_bottom_right = 9
+
+# the current desktop's number
+[[frame]]
+name = "ws_active"
+padding = 0
+fill = "accent"
+fill_opacity = 1
+border = "none"
+header = "none"
+
+# terminal and other windows (theme.toml [windows])
+[[frame]]
+name = "window"
+padding = 0
+fill = "none"
+border = "accent"
+border_opacity = 0.75
+header = "tab"
+header_fill = "accent_dim"
+header_opacity = 0.9
+header_line = "accent"
+header_height = 20
+title_color = "accent_bright"
+title_size = 11
+title_upper = true
+title_spacing = 1.5
+tab_slant = 12
+tab_width = 96
+corner_mark = "accent_dim"
+mark_size = 10
+shadow = 0
+
+# a window you're not using
+[[frame]]
+name = "window_idle"
+padding = 0
+fill = "none"
+border = "line"
+header = "tab"
+header_fill = "line"
+header_opacity = 0.9
+header_line = "accent_dim"
+header_height = 20
+title_color = "dim"
+title_size = 11
+title_upper = true
+title_spacing = 1.5
+tab_slant = 12
+tab_width = 96
+shadow = 0
+
+# launcher rows (theme.toml [launcher])
+[[frame]]
+name = "row"
+padding = 4
+fill = "surface"
+fill_opacity = 0.75
+border = "line"
+header = "none"
+cut_top_right = 8
+cut_bottom_left = 0
+
+[[frame]]
+name = "row_selected"
+padding = 4
+fill = "accent_dim"
+fill_opacity = 0.55
+border = "accent"
+header = "none"
+cut_top_right = 8
+stripe = "accent"
+stripe_side = "left"
+stripe_width = 3
+stripe_gap = 5
+
+[[frame]]
+name = "launcher"
+padding = 14
+fill = "bg"
+fill_opacity = 1
+border = "line"
+border_sides = "left"
+header = "none"
+stripe = "accent"
+stripe_side = "left"
+stripe_width = 2
+hatch = "accent_dim"
+hatch_corner = "top_left"
+hatch_width = 34
+hatch_height = 5
+ticks = "line"
+ticks_side = "top"
+tick_spacing = 7

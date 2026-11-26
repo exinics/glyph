@@ -1,0 +1,346 @@
+using Glyph.Render;
+using Glyph.Wallpaper;
+using Glyph.Widgets;
+
+namespace Glyph;
+
+/// Loads the active theme and composes each frame: backdrop, wallpaper layers (characters),
+/// widgets (characters or smooth shapes) and the problems box. Also handles mouse hover and clicks.
+/// Shared by the live desktop and snapshots.
+internal sealed class Composer : IDisposable
+{
+    public AppSettings App = new();
+    public Theme Theme = new("none");
+    public WallpaperScene Scene = new();
+    public readonly List<Widget> Widgets = new();
+    public List<string> Problems = new();
+    public readonly List<string> RenderProblems = new();
+    public readonly Grid Grid = new();
+    readonly Frame frame = new();
+    public readonly WidgetEnv Env = new();
+    public int Generation;          // bumps on every load (so caches know to refresh)
+
+    public FontOptions Font => Theme.Options.Font;
+    public EffectSettings Effects => Theme.Options.Effects;
+
+    /// Loads the theme in use (or `themeOverride`, for the editor's preview).
+    public void Load(string? themeOverride = null)
+    {
+        var problems = new List<string>();
+        var app = AppSettings.Load(problems);
+        if (themeOverride != null) app.Theme = themeOverride;
+        if (!Directory.Exists(Paths.ThemeDir(app.Theme)))
+        {
+            var first = Directory.Exists(Paths.Themes) ? Directory.GetDirectories(Paths.Themes).Select(Path.GetFileName).FirstOrDefault() : null;
+            problems.Add($"glyph.toml: theme \"{app.Theme}\" not found in config\\themes" + (first != null ? $"; showing \"{first}\"" : ""));
+            if (first != null) app.Theme = first;
+        }
+        var theme = Theme.Load(app.Theme, problems);
+        Glyph.Data.Variables.Use(Glyph.Data.Variables.LoadList(theme.Name, problems));
+        var scene = WallpaperScene.Load(theme, problems);
+        var shortcuts = ShortcutStore.Load(problems);
+        var widgets = new List<Widget>();
+        var wlist = WidgetsFile.Load(theme, problems).Widgets;
+        for (int k = 0; k < wlist.Count; k++)
+        {
+            var o = wlist[k];
+            if (!o.Enabled) continue;
+            try { var w = Widget.Create(o, theme, shortcuts, problems); w.FileIndex = k; widgets.Add(w); }
+            catch (Exception e) { problems.Add($"widgets.toml: {o.Type}: {e.Message}"); }
+        }
+
+        Scene.Dispose();
+        foreach (var w in Widgets) w.Dispose();
+        Widgets.Clear();
+        App = app; Theme = theme; Scene = scene; Problems = problems;
+        Widgets.AddRange(widgets);
+        Env.Painter.Reset();
+        Env.Theme = theme;
+        Generation++;
+        foreach (var p in problems) Log.Write("config: " + p);
+        if (problems.Count == 0) Log.Write($"loaded theme \"{theme.Name}\", no problems");
+    }
+
+    /// True while something on screen moves by itself (so frames must keep coming).
+    public bool Animated => Scene.Animated || Widgets.Any(w => w.Animated) || ripples.Count > 0 || trail.Count > 0;
+
+    // ---------------- background interaction: ripples, trail, actions ----------------
+
+    readonly List<(float x, float y, float t)> ripples = new();
+    readonly List<(float x, float y, float t)> trail = new();
+    float lastTime;
+    public Action<string>? BackgroundAction;
+    InteractionOptions I => Scene.Options.Interaction;
+
+    public void AddTrail(float x, float y)
+    {
+        if (!I.Trail) return;
+        trail.Add((x, y, lastTime));
+        if (trail.Count > 400) trail.RemoveAt(0);
+    }
+
+    /// The mouse wheel over empty desktop.
+    public void Wheel(float x, float y, int delta)
+    {
+        foreach (var w in Widgets) if (w.Bounds.Contains(x, y)) { w.Wheel(x, y, delta, Env); return; }
+        var a = delta > 0 ? I.OnScrollUp : I.OnScrollDown;
+        if (a.Length > 0) BackgroundAction?.Invoke(a);
+    }
+
+    void BackgroundClick(float x, float y, int count)
+    {
+        if (I.Ripple) ripples.Add((x, y, lastTime));
+        var a = count == 2 ? I.OnDoubleClick : I.OnClick;
+        if (a.Length > 0) BackgroundAction?.Invoke(a);
+    }
+
+    void DrawInteractionCells()
+    {
+        var g = Grid;
+        float cw = Env.CellW, ch = Env.CellH;
+        ripples.RemoveAll(r => lastTime - r.t > I.RippleDuration);
+        trail.RemoveAll(p => lastTime - p.t > I.TrailDuration);
+        if (Theme.Smooth) return;
+        var rc = Theme[I.RippleColor].Packed;
+        var rchars = Cp.Of(I.RippleChars.Length > 0 ? I.RippleChars : "·");
+        foreach (var r in ripples)
+        {
+            float k = (lastTime - r.t) / I.RippleDuration;
+            float radius = I.RippleSize * k;
+            int steps = Math.Max(12, (int)(radius * 0.4f));
+            int chi = Math.Min(rchars.Length - 1, (int)(k * rchars.Length));
+            for (int s = 0; s < steps; s++)
+            {
+                float a = s * MathF.Tau / steps;
+                int x = (int)((r.x + MathF.Cos(a) * radius) / cw), y = (int)((r.y + MathF.Sin(a) * radius) / ch);
+                g.Put(x, y, rchars[chi], Px.Alpha(rc, 1 - k));
+            }
+        }
+        var tc = Theme[I.TrailColor].Packed;
+        var tchars = Cp.Of(I.TrailChars.Length > 0 ? I.TrailChars : "·");
+        foreach (var p in trail)
+        {
+            float k = (lastTime - p.t) / I.TrailDuration;
+            g.Put((int)(p.x / cw), (int)(p.y / ch), tchars[Math.Min(tchars.Length - 1, (int)(k * tchars.Length))], Px.Alpha(tc, 1 - k));
+        }
+    }
+
+    public void DrawInteractionVector(Canvas c)
+    {
+        if (!Theme.Smooth) return;
+        var rc = Theme[I.RippleColor];
+        foreach (var r in ripples)
+        {
+            float k = (lastTime - r.t) / I.RippleDuration;
+            float radius = I.RippleSize * k;
+            c.Ring(r.x, r.y, radius, rc, 2.5f * (1 - k) + 0.5f, 1 - k);
+        }
+        var tc = Theme[I.TrailColor];
+        foreach (var p in trail)
+        {
+            float k = (lastTime - p.t) / I.TrailDuration;
+            c.Dot(p.x, p.y, 3.5f * (1 - k) + 0.5f, tc, 1 - k);
+        }
+    }
+
+    public Rgba ClearColor => Theme[Scene.Options.Backdrop.Color];
+
+    public void Compose(int pxW, int pxH, int cellW, int cellH, float time, float dt, float cursorPxX, float cursorPxY, RectangleF? area = null)
+    {
+        Env.Area = area ?? new RectangleF(0, 0, pxW, pxH);
+        int cols = Math.Max(1, (pxW + cellW - 1) / cellW), rows = Math.Max(1, (pxH + cellH - 1) / cellH);
+        Grid.Resize(cols, rows);
+        frame.Grid = Grid; frame.Theme = Theme; frame.Time = time; frame.Dt = dt;
+        frame.Aspect = cellH / (float)cellW;
+        frame.CursorX = cursorPxX / cellW; frame.CursorY = cursorPxY / cellH;
+        Env.W = pxW; Env.H = pxH; Env.CellW = cellW; Env.CellH = cellH; Env.Theme = Theme; Env.Time = time;
+        SetupPainter(cellW, cellH);
+        lastTime = time;
+        Scene.Draw(frame);
+        DrawInteractionCells();
+        foreach (var w in Widgets) { w.Layout(Env); w.DrawCells(Grid, Env); }
+        DrawProblems();
+    }
+
+    void SetupPainter(int cellW, int cellH)
+    {
+        var p = Env.Painter;
+        p.Terminal = !Theme.Smooth; p.CellW = cellW; p.CellH = cellH; p.Theme = Theme; p.Canvas = Env.Canvas;
+        p.Font = Theme.Options.Ui.Font; p.MonoFont = Theme.Options.Font.Font;
+        Env.BaseFontSize = p.FontSize = Theme.Options.Ui.FontSize;
+    }
+
+    /// What the widgets would show now; the desktop redraws when this changes.
+    public string Signature()
+    {
+        if (Env.Theme == null) return "";
+        var sb = new System.Text.StringBuilder();
+        foreach (var w in Widgets) sb.Append(w.Signature(Env)).Append('#');
+        return sb.ToString();
+    }
+
+    /// Backdrop gradient or picture (a solid colour is just the clear colour).
+    public void DrawBackdrop(Canvas c)
+    {
+        var b = Scene.Options.Backdrop;
+        var area = new RectangleF(0, 0, Env.W, Env.H);
+        if (b.Type == "gradient") c.Gradient(area, b.Colors.Select(n => Theme[n]).ToList(), b.Angle, b.Shape == "radial");
+        else if (b.Type == "image" && b.File.Length > 0) c.Picture(Paths.FindAsset(b.File, Theme.Name, "images"), area, b.Fit, b.Dim);
+    }
+
+    public bool HasBackdrop => Scene.Options.Backdrop.Type is "gradient" || (Scene.Options.Backdrop.Type == "image" && Scene.Options.Backdrop.File.Length > 0);
+
+    public void DrawWidgets(Canvas c)
+    {
+        DrawInteractionVector(c);
+        if (Theme.Smooth) DrawLinks(c);
+        foreach (var w in Widgets) w.DrawVector(c, Env);
+    }
+
+    /// Lines from a panel to the panel named in its Link to (drawn under the panels).
+    void DrawLinks(Canvas c)
+    {
+        foreach (var w in Widgets)
+        {
+            var o = w.Opt;
+            if (o == null || o.LinkTo.Length == 0 || w.Bounds.IsEmpty) continue;
+            var to = Widgets.FirstOrDefault(x => x != w && x.Opt != null && x.Opt.Name.Equals(o.LinkTo, StringComparison.OrdinalIgnoreCase));
+            if (to == null || to.Bounds.IsEmpty) continue;
+            LinkLine(c, w.Bounds, to.Bounds, o);
+        }
+    }
+
+    void LinkLine(Canvas c, RectangleF s, RectangleF d, WidgetOptions o)
+    {
+        var col = c.Brush(Theme[o.LinkColor]);
+        bool horiz = d.Left >= s.Right || d.Right <= s.Left;
+        PointF a, b;
+        if (horiz)
+        {
+            bool right = d.Left >= s.Right;
+            float ey = d.Y + d.Height / 2;
+            a = new PointF(right ? s.Right : s.Left, Math.Clamp(ey, s.Top + 8, s.Bottom - 8));
+            b = new PointF(right ? d.Left : d.Right, ey);
+        }
+        else
+        {
+            bool down = d.Top >= s.Bottom;
+            float ex = d.X + d.Width / 2;
+            a = new PointF(Math.Clamp(ex, s.Left + 8, s.Right - 8), down ? s.Bottom : s.Top);
+            b = new PointF(ex, down ? d.Top : d.Bottom);
+        }
+        int n = Math.Max(1, o.LinkLines);
+        for (int i = 0; i < n; i++)
+        {
+            float off = (i - (n - 1) / 2f) * o.LinkGap;
+            var a2 = horiz ? new PointF(a.X, a.Y + off) : new PointF(a.X + off, a.Y);
+            var b2 = horiz ? new PointF(b.X, b.Y + off) : new PointF(b.X + off, b.Y);
+            var pts = new List<System.Numerics.Vector2> { new(a2.X, a2.Y) };
+            if (o.LinkShape == "elbow")
+            {
+                float dx = b2.X - a2.X, dy = b2.Y - a2.Y, m = Math.Min(Math.Abs(dx), Math.Abs(dy));
+                // straight out of the box first, then the 45° part, then straight into the other box
+                float lead = horiz ? Math.Min(12, (Math.Abs(dx) - m) / 2) : Math.Min(12, (Math.Abs(dy) - m) / 2);
+                var p = new System.Numerics.Vector2(a2.X, a2.Y);
+                if (lead > 0) { p += horiz ? new System.Numerics.Vector2(Math.Sign(dx) * lead, 0) : new System.Numerics.Vector2(0, Math.Sign(dy) * lead); pts.Add(p); }
+                p += new System.Numerics.Vector2(Math.Sign(dx) * m, Math.Sign(dy) * m);
+                pts.Add(p);
+            }
+            pts.Add(new(b2.X, b2.Y));
+            for (int k = 1; k < pts.Count; k++) c.Dc.DrawLine(pts[k - 1], pts[k], col, o.LinkWidth);
+            if (o.LinkEnds is "dot" or "both") c.Fill(new RectangleF(b2.X - 2, b2.Y - 2, 4, 4), Theme[o.LinkColor]);
+            if (o.LinkEnds == "both") c.Fill(new RectangleF(a2.X - 2, a2.Y - 2, 4, 4), Theme[o.LinkColor]);
+        }
+    }
+
+    public bool HasVectorLayer => Widgets.Count > 0 || Theme.Smooth;
+
+    // ---------------- mouse ----------------
+
+    Widget? downWidget; int downItem = -1;
+    Widget? lastWidget; int lastItem = -1; long lastClickMs; PointF lastClickPt;
+    readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+
+    /// Updates which item is under the mouse. Returns true if that changed (needs a redraw).
+    public bool UpdateHover(float x, float y, bool overDesktop)
+    {
+        bool changed = false;
+        foreach (var w in Widgets)
+        {
+            int h = overDesktop ? w.HitTest(x, y) : -1;
+            if (h != w.Hover) { w.Hover = h; changed = true; }
+        }
+        return changed;
+    }
+
+    public void MouseDown(float x, float y)
+    {
+        downWidget = null; downItem = -1;
+        bgDown = Widgets.Any(w => w.Bounds.Contains(x, y)) ? new PointF(-1e6f, -1e6f) : new PointF(x, y);
+        foreach (var w in Widgets)
+        {
+            int h = w.HitTest(x, y);
+            if (h >= 0) { downWidget = w; downItem = h; return; }
+        }
+    }
+
+    PointF bgDown = new(-1e6f, -1e6f); long lastBgClick; PointF lastBgPt;
+
+    public void MouseUp(float x, float y)
+    {
+        if (downWidget == null)
+        {
+            if (Math.Abs(x - bgDown.X) > 6 || Math.Abs(y - bgDown.Y) > 6) return;
+            long nowMs = clock.ElapsedMilliseconds;
+            bool dblBg = nowMs - lastBgClick <= SystemInformation.DoubleClickTime && Math.Abs(x - lastBgPt.X) <= 8 && Math.Abs(y - lastBgPt.Y) <= 8;
+            BackgroundClick(x, y, dblBg ? 2 : 1);
+            lastBgClick = dblBg ? 0 : nowMs; lastBgPt = new PointF(x, y);
+            return;
+        }
+        int h = downWidget.HitTest(x, y);
+        if (h != downItem) { downWidget = null; return; }
+        long now = clock.ElapsedMilliseconds;
+        bool dbl = lastWidget == downWidget && lastItem == h && now - lastClickMs <= SystemInformation.DoubleClickTime
+                   && Math.Abs(x - lastClickPt.X) <= SystemInformation.DoubleClickSize.Width && Math.Abs(y - lastClickPt.Y) <= SystemInformation.DoubleClickSize.Height;
+        Log.D($"click on item {h} ({(dbl ? "double" : "single")})");
+        downWidget.Click(h, dbl ? 2 : 1, Env);
+        if (dbl) { lastWidget = null; lastItem = -1; }
+        else { lastWidget = downWidget; lastItem = h; lastClickMs = now; lastClickPt = new PointF(x, y); }
+        downWidget = null;
+    }
+
+    // ---------------- problems box ----------------
+
+    void DrawProblems()
+    {
+        var all = Problems.Concat(RenderProblems).ToList();
+        if (all.Count == 0) return;
+        var g = Grid;
+        const int maxShown = 10;
+        var lines = new List<string> { " glyph found a problem in your config " };
+        lines.Add("");
+        foreach (var p in all.Take(maxShown)) lines.Add(" • " + p);
+        if (all.Count > maxShown) lines.Add($" … and {all.Count - maxShown} more (see logs\\glyph.log)");
+        lines.Add("");
+        lines.Add(" Fix it and save: changes apply straight away. Until then, anything unreadable uses its default.");
+        int maxW = Math.Max(20, g.W - 8);
+        var wrapped = new List<string>();
+        foreach (var l in lines)
+        {
+            var s = l;
+            while (s.Length > maxW - 4) { wrapped.Add(s[..(maxW - 4)]); s = "   " + s[(maxW - 4)..]; }
+            wrapped.Add(s);
+        }
+        int w = Math.Min(maxW, wrapped.Max(l => l.Length) + 4), h = wrapped.Count + 2;
+        int x0 = (g.W - w) / 2, y0 = 2;
+        uint border = Theme["accent_bright"].Packed, text = Theme["text"].Packed, fill = Theme["surface"].Packed, title = Theme["accent"].Packed;
+        g.Box(x0, y0, w, h, border, fill);
+        for (int i = 0; i < wrapped.Count; i++) g.Text(x0 + 2, y0 + 1 + i, wrapped[i], i == 0 ? title : text);
+    }
+
+    public void Dispose()
+    {
+        Scene.Dispose();
+        foreach (var w in Widgets) w.Dispose();
+    }
+}

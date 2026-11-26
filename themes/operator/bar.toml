@@ -1,0 +1,237 @@
+# The bar: every module (or group of joined modules) sits in its own frame.
+enabled       = true
+position      = "top"
+height        = 34
+reserve_space = true
+margin        = 4
+background    = "bg"
+opacity       = 0
+border_width  = 0
+font          = "Cascadia Mono"
+font_size     = 11
+padding       = 6
+gap           = 6
+effects       = false
+module_frame  = "module"
+module_padding = 9
+module_inset  = 3
+join_gap      = 8
+
+[[left]]
+type = "text"
+format = "NC//"
+color = "accent_bright"
+bold = true
+frame = "logo"
+on_click = "launcher"
+
+[[left]]
+type = "workspaces"
+digits = 2
+active_color = "accent"
+inactive_color = "dim"
+active_text = "bg"
+active_frame = "ws_active"
+min_count = 5
+bold = true
+
+[[left]]
+type = "text"
+format = "LINK"
+color = "dim"
+size = "small"
+spacing = 1
+join = true
+
+[[left]]
+type = "text"
+format = "[line]接続[/]"
+size = "small"
+join = true
+
+[[left]]
+type = "icons"
+names = ["Firefox", "Discord", "Visual Studio Code", "Obsidian"]
+icon_size = 16
+
+[[center]]
+type = "text"
+format = "{time:HH:mm}"
+color = "bright"
+bold = true
+size = "large"
+join = true
+on_click = "keys:win+n"
+
+[[center]]
+type = "text"
+format = "{date:ddd dd.MM|upper} // {date:dddd|map:Sunday=日曜日,Monday=月曜日,Tuesday=火曜日,Wednesday=水曜日,Thursday=木曜日,Friday=金曜日,Saturday=土曜日}"
+color = "dim"
+size = "small"
+on_click = "keys:win+n"
+
+[[right]]
+type = "text"
+format = "SYS [line]系統[/]"
+color = "dim"
+size = "small"
+spacing = 1
+join = true
+
+[[right]]
+type = "text"
+format = "⚙"
+color = "accent"
+join = true
+on_click = "settings"
+
+[[right]]
+type = "text"
+format = "☀"
+color = "accent"
+on_click = "ms-settings:display"
+
+[[right]]
+type = "text"
+format = "CPU [line]速度[/]"
+color = "dim"
+size = "small"
+spacing = 1
+join = true
+on_click = "taskmgr"
+
+[[right]]
+type = "meter"
+value = "cpu"
+label = ""
+format = "{cpu:0|pad:3}"
+width = 4
+segments = 4
+bar_height = 9
+fill_color = "accent"
+track_color = "line"
+color = "text"
+on_click = "taskmgr"
+
+[[right]]
+type = "text"
+format = "MEM [line]記憶[/]"
+color = "dim"
+size = "small"
+spacing = 1
+join = true
+on_click = "taskmgr"
+
+[[right]]
+type = "meter"
+value = "ram"
+label = ""
+format = "{ram:0|pad:3}"
+width = 6
+segments = 6
+bar_height = 9
+fill_color = "accent"
+track_color = "line"
+color = "text"
+on_click = "taskmgr"
+
+[[right]]
+type = "text"
+format = "VOL"
+color = "dim"
+size = "small"
+spacing = 1
+join = true
+on_click = "volume:mute"
+on_scroll_up = "volume:up"
+on_scroll_down = "volume:down"
+
+[[right]]
+type = "text"
+format = "{volume:0|default:--|pad:3}{muted|map:muted= ✕}"
+color = "text"
+hide_when_empty = false
+on_click = "volume:mute"
+on_scroll_up = "volume:up"
+on_scroll_down = "volume:down"
+
+[[right]]
+type = "text"
+format = "NET"
+color = "dim"
+size = "small"
+spacing = 1
+join = true
+on_click = "ms-settings:network-wifi"
+
+[[right]]
+type = "meter"
+value = "wifi"
+label = ""
+format = "{wifi|upper|max:14}{network|map:ethernet=WIRED,none=OFFLINE,wifi=,mobile=MOBILE}"
+width = 3
+segments = 4
+bar_height = 9
+fill_color = "accent"
+track_color = "line"
+color = "text"
+on_click = "ms-settings:network-wifi"
+
+[[right]]
+type = "text"
+format = "BT"
+color = "dim"
+size = "small"
+spacing = 1
+join = true
+on_click = "ms-settings:bluetooth"
+
+[[right]]
+type = "text"
+format = "{bluetooth|upper|default:--}"
+color = "text"
+hide_when_empty = false
+on_click = "ms-settings:bluetooth"
+
+[[right]]
+type = "text"
+format = "BAT"
+color = "dim"
+size = "small"
+spacing = 1
+join = true
+on_click = "ms-settings:batterysaver"
+
+[[right]]
+type = "meter"
+value = "battery"
+label = ""
+format = "{battery|pad:3}"
+width = 9
+segments = 10
+bar_height = 9
+fill_color = "accent"
+track_color = "line"
+color = "text"
+on_click = "ms-settings:batterysaver"
+
+[[right]]
+type = "text"
+format = "LNG"
+color = "dim"
+size = "small"
+spacing = 1
+join = true
+on_click = "keys:win+space"
+
+[[right]]
+type = "text"
+format = "{lang}"
+color = "text"
+on_click = "keys:win+space"
+
+[[right]]
+type = "text"
+format = "⏻"
+color = "alert"
+on_click = "keys:win+x"

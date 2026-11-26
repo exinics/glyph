@@ -1,0 +1,129 @@
+# The panels on the desktop. Easiest to change in the settings window (Design page).
+
+[[widget]]
+type = "feed"
+name = "core"
+title = "SYS.CORE  //  NODE AK-07  //  LIVE TELEMETRY"
+frame = "core"
+anchor = "top_left"
+offset_x = 30
+offset_y = 26
+width = 360
+lines = ["{spaces:0-8}{hex:4}  {pick:JMP,CALL,PUSH,POP,MOV,XOR,RET,CMP,AND,NOP,LEA,TEST}  {hex:2}", "{spaces:0-8}{hex:4}  {pick:JMP,CALL,MOV,XOR,PUSH}  {hex:2}    {hex:4} {hex:4}", "{spaces:2-10}{hex:4}  {pick:RET,NOP}  {pick:A7,C5,FE,01,3D,7C}"]
+interval = 1.4
+max_lines = 16
+newest_color = "accent_bright"
+old_color = "accent_dim"
+text_color = "accent"
+size = "small"
+link_to = "operator"
+link_color = "dim"
+link_lines = 2
+link_gap = 6
+
+[[widget]]
+type = "text"
+frame = "none"
+panel = false
+anchor = "top_left"
+offset_x = 410
+offset_y = 76
+mono = true
+size = "small"
+text = "[accent_dim]▢[/] [dim]CPU[/]   [text]{cpu:0|pad:3}[/]\n[accent_dim]▢[/] [dim]MEM[/]   [text]{ram:0|pad:3}[/]\n[accent_dim]▢[/] [dim]BAT[/]   [text]{battery|pad:3|default:  -}[/]\n[accent_dim]▢[/] [dim]DSK[/]   [text]{disk:0|pad:3}[/]"
+
+[[widget]]
+type = "text"
+name = "operator"
+frame = "tag"
+title = "OPERATOR"
+anchor = "top_left"
+offset_x = 560
+offset_y = 318
+size = "small"
+mono = true
+text = "[bg]GHOST  //  NETRUNNER[/]"
+
+[[widget]]
+type = "text"
+frame = "none"
+panel = false
+anchor = "top_left"
+offset_x = 30
+offset_y = 270
+mono = true
+size = "small"
+text = "[line]LOCAL NODE   //   AK-07-WS999[/]\n[line]ARRAY INTEGRITY   92.6%[/]"
+
+[[widget]]
+type = "feed"
+title = "NET.TRACE  //  追跡"
+title_right = "SUB 144"
+frame = "trace"
+anchor = "top_right"
+offset_x = 28
+offset_y = 26
+width = 420
+lines = ["0x{seq:X4}  {pick:TRACE,SYNC,PING,ROUTE,HOOK,LINK,AUTH}  {hex:2}:{hex:2}  {pick:ACK,OK,LOCKED,PASS,ACK}  {hex:4}-{hex:4}"]
+interval = 2.2
+max_lines = 10
+newest_color = "bright"
+old_color = "line"
+text_color = "dim"
+
+[[widget]]
+type = "feed"
+title = "ICE.MONITOR  //  防壁"
+title_right = "07-A"
+frame = "trace"
+anchor = "top_right"
+offset_x = 28
+offset_y = 290
+width = 420
+lines = ["0x{seq:X4}  {pick:PKT,DAEMON,ROUTE,AUTH,ICE.SCAN,PKT}  {hex:2}:{hex:2}  {pick:OK,OK,LOCKED,OK}  {hex:4}-{hex:4}"]
+interval = 3.2
+max_lines = 7
+newest_color = "bright"
+old_color = "line"
+text_color = "dim"
+
+[[widget]]
+type = "feed"
+title = "DAEMON.LOG  //  記録"
+title_right = "LIVE"
+frame = "trace"
+anchor = "top_right"
+offset_x = 28
+offset_y = 482
+width = 420
+lines = ["0x{seq:X4}  {pick:ICE.SCAN,ROUTE,AUTH,PKT,DAEMON}  {hex:2}:{hex:2}  {pick:OK,LOCKED,ACK,PASS}  {hex:4}-{hex:4}"]
+interval = 4.1
+max_lines = 6
+newest_color = "bright"
+old_color = "line"
+text_color = "dim"
+
+[[widget]]
+type = "media"
+title = "RADIOPORT  //  ラジオ"
+title_right = "88.2 FM  ≡"
+frame = "radio"
+anchor = "bottom_left"
+offset_x = 30
+offset_y = 26
+width = 430
+line0 = "[dim]{media_app|upper|default:SIGNAL} // ON AIR[/]"
+line1 = "{media_title|max:34}"
+line2 = "{media_artist}"
+art = true
+art_rows = 5
+art_style = "original"
+times_beside = true
+progress_segments = 26
+controls = true
+hide_when_idle = false
+visualiser = true
+visualiser_bars = 40
+visualiser_rows = 2.5
+visualiser_color = "accent_dim"
+visualiser_peak = "accent"

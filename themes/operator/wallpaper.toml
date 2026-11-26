@@ -1,0 +1,16 @@
+# Behind everything: a dark navy fade (put your own picture here: type = "image", file = "...").
+fps = 30
+
+[backdrop]
+type   = "gradient"
+color  = "bg"
+colors = ["glow", "bg", "bg"]
+angle  = 0
+shape  = "radial"
+
+[cursor]
+enabled = false
+
+[interaction]
+ripple       = true
+ripple_color = "accent_dim"
