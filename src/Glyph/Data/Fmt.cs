@@ -10,6 +10,7 @@ internal readonly record struct Span(string Text, Rgba Color);
 ///   {name}            a value, e.g. {cpu}, {media_title}
 ///   {name:spec}       times/dates take .NET formats ({time:HH:mm}); numbers take number formats ({cpu:0.0});
 ///                     text takes a maximum length ({window:40})
+///   {icon:name}       an icon from Google's Material Symbols (fonts.google.com/icons), e.g. {icon:wifi}
 ///   [colour]…[/]      colour markup: a palette name or hex code; [/] goes back to the default colour
 ///   \n                a new line (in multi-line widgets)
 internal static class Fmt
@@ -41,7 +42,8 @@ internal static class Fmt
                 var parts = inner.Split('|');
                 int colon = parts[0].IndexOf(':');
                 string name = colon < 0 ? parts[0] : parts[0][..colon], spec = colon < 0 ? "" : parts[0][(colon + 1)..];
-                var v = value(name.Trim().ToLowerInvariant(), spec);
+                var key = name.Trim().ToLowerInvariant();
+                var v = key == "icon" ? Glyph.Render.Symbols.Text(spec) : value(key, spec);   // {icon:home}: a Material Symbols icon
                 if (v == null) { cur.Append("{" + inner + "}"); i = end; continue; }
                 Rgba? vc = null;
                 if (parts.Length > 1) (v, vc) = Filter(v, parts.AsSpan(1), theme);
@@ -170,7 +172,9 @@ internal static class Fmt
             var inner = format.Substring(i + 1, end - i - 1).Split('|')[0];
             int colon = inner.IndexOf(':');
             any = true;
-            var v = value((colon < 0 ? inner : inner[..colon]).Trim().ToLowerInvariant(), colon < 0 ? "" : inner[(colon + 1)..]);
+            var name = (colon < 0 ? inner : inner[..colon]).Trim().ToLowerInvariant();
+            if (name == "icon") { some = true; continue; }   // an icon is always there
+            var v = value(name, colon < 0 ? "" : inner[(colon + 1)..]);
             if (!string.IsNullOrWhiteSpace(v)) some = true;
         }
         return !any || some;

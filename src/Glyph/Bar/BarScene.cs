@@ -45,6 +45,7 @@ internal sealed class BarScene
         p.Font = O.Font.Length > 0 ? O.Font : Theme.Options.Ui.Font;
         p.MonoFont = Theme.Options.Font.Font;
         p.FontSize = O.FontSize > 0 ? O.FontSize : Theme.Options.Ui.FontSize;
+        p.HoverColor = O.HoverColor;
     }
 
     Rgba? Pill(BarModuleOptions m)
@@ -97,7 +98,7 @@ internal sealed class BarScene
                     }
                     if (row.Items.Count == 0) return null;
                     row.Tag = m;
-                    return row;
+                    return Captioned(m, row);
                 }
             case GraphModule g:
                 {
@@ -140,15 +141,95 @@ internal sealed class BarScene
                     }
                     row.WheelUp = "desktop:prev"; row.WheelDown = "desktop:next";
                     row.Tag = m;
-                    return row;
+                    return Captioned(m, row);
+                }
+            case TasksModule tk:
+                {
+                    var row = new RowEl { Gap = Painter.Terminal ? 1 : tk.Spacing / (Painter.FontSize * 0.5f) };
+                    float size = tk.IconSize > 0 ? tk.IconSize : MathF.Round(Painter.FontSize * 1.3f);
+                    var tint = new Gradient(Theme, new[] { "accent_dim", "accent", "bright" });
+                    var tf = Painter.Terminal ? null : Theme.Frame(tk.TaskFrame);
+                    var af = Painter.Terminal ? null : Theme.Frame(tk.ActiveFrame) ?? tf;
+                    var wins = Tasks.Now().Where(x => !tk.Hide.Any(n => n.Trim().Length > 0 && (x.App.Contains(n.Trim(), StringComparison.OrdinalIgnoreCase) || x.Title.Contains(n.Trim(), StringComparison.OrdinalIgnoreCase))));
+                    var groupsOf = tk.Combine
+                        ? wins.GroupBy(x => x.App).Select(g => g.ToList()).ToList()
+                        : wins.Select(x => new List<Tasks.Win> { x }).ToList();
+                    foreach (var grp in groupsOf.Take(tk.MaxCount))
+                    {
+                        var win = grp.FirstOrDefault(x => x.Active) ?? grp[0];
+                        bool anyActive = grp.Any(x => x.Active), allMin = grp.All(x => x.Minimised);
+                        var h = grp[0].Handle;
+                        var handles = string.Join(",", grp.Select(x => x.Handle.ToInt64()));
+                        var c = anyActive && tk.ActiveColor != "auto" ? Theme[tk.ActiveColor] : allMin ? Theme[tk.MinimisedColor] : color;
+                        var parts = new RowEl { Gap = Painter.Terminal ? 1 : 0.8f };
+                        if (tk.Icons && !Painter.Terminal)
+                            parts.Items.Add(new ImageEl
+                            {
+                                Key = "task|" + h + "|" + win.App, Px = size, Rows = 1, Style = tk.Style, Tint = tint, Mono = c,
+                                Source = () => { var b = Tasks.Icon(h); return b == null ? null : new Bitmap(b); },
+                            });
+                        if (tk.Format.Length > 0)
+                        {
+                            var text = Fmt.Text(tk.Format, (n, spec) => n == "title" ? win.Title : n == "app" ? win.App : n == "count" ? grp.Count.ToString() : Stats.Value(n, spec));
+                            if (tk.MaxLength > 0 && text.Length > tk.MaxLength) text = text[..Math.Max(1, tk.MaxLength - 1)] + "…";
+                            parts.Items.Add(new TextEl(text, c) { Bold = anyActive && m.Bold });
+                        }
+                        El one = parts;
+                        var fr = anyActive ? af : tf;
+                        if (fr != null) one = new BoxEl { Child = parts, Frame = fr, PadX = O.ModulePadding * 0.6f, MinH = Math.Max(0, BoxHeight() * 0.62f) };
+                        one.Action = "task:" + handles;
+                        if (tk.RightClick != "none") one.RightAction = $"taskop:{tk.RightClick}:{handles}";
+                        one.Hot = false;
+                        row.Items.Add(one);
+                    }
+                    if (row.Items.Count == 0) return null;
+                    el = row;
+                    break;
+                }
+            case TrayModule tr:
+                {
+                    Tray.Use();
+                    var row = new RowEl { Gap = Painter.Terminal ? 1 : tr.Spacing / (Painter.FontSize * 0.5f) };
+                    float size = tr.IconSize > 0 ? tr.IconSize : MathF.Round(Painter.FontSize * 1.3f);
+                    var tint = new Gradient(Theme, new[] { "accent_dim", "accent", "bright" });
+                    var fr = Painter.Terminal ? null : Theme.Frame(tr.IconFrame);
+                    foreach (var ic in Tray.Now().Where(x => (tr.ShowHidden || !x.Hidden) && x.Picture != null
+                                 && !tr.Hide.Any(n => n.Trim().Length > 0 && (x.Process.Contains(n.Trim(), StringComparison.OrdinalIgnoreCase) || x.Tip.Contains(n.Trim(), StringComparison.OrdinalIgnoreCase)))).Take(tr.MaxCount))
+                    {
+                        var icon = ic;
+                        El one = new ImageEl
+                        {
+                            Key = "tray|" + icon.Key + "|" + icon.PictureVersion, Px = size, Rows = 1, Style = Painter.Terminal ? "mono" : tr.Style, Tint = tint, Mono = color,
+                            Source = () => Tray.CopyPicture(icon.Key),
+                        };
+                        if (fr != null) one = new BoxEl { Child = one, Frame = fr, PadX = 4, PadY = 2 };
+                        one.Action = $"trayicon:{icon.Key}|left";
+                        one.RightAction = $"trayicon:{icon.Key}|right";
+                        row.Items.Add(one);
+                    }
+                    if (row.Items.Count == 0) return null;
+                    row.Tag = m;
+                    el = row;
+                    break;
                 }
             case SpacerModule sp:
                 return new TextEl(new string(' ', Math.Max(0, sp.Width)), color) { Tag = m };
         }
         if (el == null) return null;
         el.Tag = m;
-        el.Action = m.OnClick; el.RightAction = m.OnRightClick; el.WheelUp = m.OnScrollUp; el.WheelDown = m.OnScrollDown;
-        return el;
+        if (m is not (TasksModule or TrayModule)) { el.Action = m.OnClick; el.RightAction = m.OnRightClick; }
+        el.WheelUp = m.OnScrollUp; el.WheelDown = m.OnScrollDown;
+        return Captioned(m, el);
+    }
+
+    /// The module with its Caption above or under it (smooth style).
+    El Captioned(BarModuleOptions m, El el)
+    {
+        if (m.Caption.Length == 0 || Painter.Terminal) return el;
+        var cap = new TextEl { Spans = { new Span(Fmt.Text(m.Caption, Stats.Value), Theme[m.CaptionColor]) }, Size = TextSize.Small, Spacing = m.CaptionSpacing, Tight = true };
+        var col = new ColEl { Tag = m };
+        if (m.CaptionBelow) { col.Items.Add(el); col.Items.Add(cap); } else { col.Items.Add(cap); col.Items.Add(el); }
+        return col;
     }
 
     /// Height of a module frame: the bar's height less the inset (smooth style).

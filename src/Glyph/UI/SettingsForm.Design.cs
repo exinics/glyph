@@ -62,11 +62,11 @@ internal sealed partial class SettingsForm
         var split = Split(-400);   // the properties panel keeps 400 pixels
         split.Panel1.Controls.Add(view);
         split.Panel1.Controls.Add(swatchStrip);
-        split.Panel2.Controls.Add(designGrid);
+        BuildPanes(split.Panel2);
         split.Panel2.Controls.Add(selLabel);
         root.Controls.Add(split);
         root.Controls.Add(tools);
-        root.Controls.Add(Hint("Click anything to change it: a widget, the bar, a module on the bar, or the background. Drag to move, drag the corner to resize, or draw a new box.", 28));
+        root.Controls.Add(Hint("Click anything to change it: a part of a widget (a tab, a title, a button…), the bar, a module on the bar, or the background. Drag to move, drag the corner to resize, or draw a new box. On the right: Properties, Look (the part's frame) and Animations.", 46));
 
         view.Paint += PaintView;
         view.MouseDown += ViewDown;
@@ -106,14 +106,14 @@ internal sealed partial class SettingsForm
 
     // ───────────── selection ─────────────
 
-    void Select(Sel s, int index = -1, BarModuleOptions? module = null)
+    void Select(Sel s, int index = -1, BarModuleOptions? module = null, Part? part = null)
     {
-        sel = s; selIndex = index; selModule = module;
+        sel = s; selIndex = index; selModule = module; selPart = s == Sel.Widget ? part : null;
+        if (s != Sel.Widget) { paneButtons.Visible = false; ShowPane(Pane.Props); }
         switch (s)
         {
             case Sel.Widget when index >= 0 && index < widgets.Widgets.Count:
-                designGrid.SelectedObject = widgets.Widgets[index];
-                selLabel.Text = "Widget: " + widgets.Widgets[index];
+                ShowSelection();
                 break;
             case Sel.Module when module != null:
                 designGrid.SelectedObject = module;
@@ -231,6 +231,18 @@ internal sealed partial class SettingsForm
 
     RectangleF Handle(RectangleF viewRect) => new(viewRect.Right - 7, viewRect.Bottom - 7, 14, 14);
 
+    /// Where the picked part is in the latest preview frame (parts are rebuilt every frame: find the same one again).
+    RectangleF? PartRect(Part part)
+    {
+        if (info == null) return null;
+        foreach (var (fi, pt) in info.Parts) if (fi == selIndex && pt.Name == part.Name && pt.Rect == part.Rect) return pt.Rect;
+        // moved or resized: the part with the same name nearest to where it was
+        var same = info.Parts.Where(x => x.fileIndex == selIndex && x.part.Name == part.Name).Select(x => x.part.Rect).ToList();
+        if (same.Count == 0) return null;
+        float cx = part.Rect.X + part.Rect.Width / 2, cy = part.Rect.Y + part.Rect.Height / 2;
+        return same.OrderBy(r => Math.Abs(r.X + r.Width / 2 - cx) + Math.Abs(r.Y + r.Height / 2 - cy)).First();
+    }
+
     void PaintView(object? s, PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -247,6 +259,15 @@ internal sealed partial class SettingsForm
         foreach (var (_, r, _) in info.Widgets) { var v = ToView(r); g.DrawRectangle(dim, v.X, v.Y, v.Width, v.Height); }
         using var acc = new Pen(Dark.Accent, 2);
         RectangleF? box = drag is Drag.Move or Drag.Resize or Drag.Draw ? dragRect : SelectedRect();
+        // the picked part, filled faintly, inside the widget's outline
+        if (drag == Drag.None && sel == Sel.Widget && selPart is Part sp && PartRect(sp) is RectangleF pr)
+        {
+            var pv = ToView(pr);
+            using var pf = new SolidBrush(Color.FromArgb(46, Dark.Accent));
+            using var pp = new Pen(Color.FromArgb(230, 255, 255, 255), 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+            g.FillRectangle(pf, pv); g.DrawRectangle(pp, pv.X, pv.Y, pv.Width, pv.Height);
+            TextRenderer.DrawText(g, sp.Name, Font, new Point((int)pv.X, (int)pv.Bottom + 2), Color.White, Dark.Accent);
+        }
         if (box is RectangleF b)
         {
             var v = ToView(b);
@@ -278,13 +299,21 @@ internal sealed partial class SettingsForm
         {
             drag = Drag.Resize; dragOrig = dragRect = sr; return;
         }
-        // topmost widget under the mouse (later ones are drawn on top)
-        for (int i = info.Widgets.Count - 1; i >= 0; i--)
+        // the smallest part under the mouse (so a box stretched over the whole screen doesn't take every click)
+        var hit = info.Parts.Where(x => x.part.Rect.Contains(p)).OrderBy(x => x.part.Rect.Width * x.part.Rect.Height).FirstOrDefault();
+        if (hit.part != null)
         {
-            var (fi, r, _) = info.Widgets[i];
-            if (!r.Contains(p)) continue;
-            Select(Sel.Widget, fi);
-            drag = Drag.Move; dragOrig = dragRect = r;
+            var wr = info.Widgets.FirstOrDefault(x => x.fileIndex == hit.fileIndex).r;
+            Select(Sel.Widget, hit.fileIndex, null, hit.part);
+            drag = Drag.Move; dragOrig = dragRect = wr;
+            return;
+        }
+        // else the smallest widget under the mouse
+        var wh = info.Widgets.Where(x => x.r.Contains(p)).OrderBy(x => x.r.Width * x.r.Height).FirstOrDefault();
+        if (wh.label != null)
+        {
+            Select(Sel.Widget, wh.fileIndex);
+            drag = Drag.Move; dragOrig = dragRect = wh.r;
             return;
         }
         if (info.BarOn && info.BarRect.Contains(p))

@@ -100,9 +100,14 @@ internal sealed class App : ApplicationContext
         checkTimer.Start();
         activityTimer.Tick += (_, _) =>
         {
-            engine.PauseReason = Glyph.Desktop.Activity.Reason(engine.CurrentSettings.Performance, out var cap);
-            engine.Covered = Glyph.Desktop.Activity.Covered(engine.CurrentSettings.Performance);
-            engine.FpsCap = cap;
+            var perf = engine.CurrentSettings.Performance;
+            engine.PauseReason = Glyph.Desktop.Activity.Reason(perf, out var mode);
+            engine.Covered = Glyph.Desktop.Activity.Covered(perf);
+            if (perf.Preset(mode) is { } preset && (preset != Perf.Current || mode != Perf.Name))
+            {
+                Perf.Current = preset; Perf.Name = mode;
+                engine.Redraw();   // redraw now with the new preset
+            }
         };
         activityTimer.Start();
 
@@ -112,7 +117,7 @@ internal sealed class App : ApplicationContext
 
         SystemEvents.SessionSwitch += OnSessionSwitch;
         shell = new ShellListener(
-            onRestart: () => { Log.Write("explorer restarted; reattaching"); host.Attach(); DesktopIcons.Apply(engine.CurrentSettings.HideDesktopIcons); },
+            onRestart: () => { if (Glyph.Data.Tray.OwnBroadcast) return; Log.Write("explorer restarted; reattaching"); host.Attach(); DesktopIcons.Apply(engine.CurrentSettings.HideDesktopIcons); },
             onClick: (x, y, down) =>
             {
                 bool desk = Engine.DesktopAt(x, y);
@@ -148,6 +153,21 @@ internal sealed class App : ApplicationContext
                 {
                     var sc = Glyph.Widgets.ShortcutStore.Load(new List<string>()).FirstOrDefault(x => string.Equals(x.Target, arg, StringComparison.OrdinalIgnoreCase));
                     if (sc != null) sc.Launch(); else Open(arg);
+                    return true;
+                }
+            case "task":
+                Glyph.Data.Tasks.Toggle(arg.Split(',').Select(x => long.TryParse(x, out var v) ? new IntPtr(v) : IntPtr.Zero).Where(x => x != IntPtr.Zero).ToList());
+                return true;
+            case "taskop":
+                {
+                    var bits = arg.Split(':', 2);
+                    if (bits.Length == 2) Glyph.Data.Tasks.Do(bits[0], bits[1].Split(',').Select(x => long.TryParse(x, out var v) ? new IntPtr(v) : IntPtr.Zero).Where(x => x != IntPtr.Zero).ToList());
+                    return true;
+                }
+            case "trayicon":
+                {
+                    int bar = arg.LastIndexOf('|');
+                    if (bar > 0) Glyph.Data.Tray.Click(arg[..bar], arg[(bar + 1)..]);
                     return true;
                 }
             case "copy": try { Clipboard.SetText(arg); } catch (Exception e) { Log.Write("copy: " + e.Message); } return true;
@@ -311,7 +331,7 @@ internal sealed class App : ApplicationContext
 
     void UpdateTooltip()
     {
-        string state = engine.UserPaused ? "paused" : engine.PauseReason.Length > 0 ? $"resting ({engine.PauseReason})" : engine.Fps < 0.5f ? "idle (nothing moving)" : $"{engine.Fps:0} fps, {engine.FrameMs:0.0} ms/frame";
+        string state = engine.UserPaused ? "paused" : engine.PauseReason.Length > 0 ? $"resting ({engine.PauseReason})" : engine.Fps < 0.5f ? "idle (nothing moving)" : $"{engine.Fps:0} fps, {Perf.Name}";
         var t = $"Glyph: {state}";
         tray.Text = t.Length > 63 ? t[..63] : t;
     }
@@ -393,15 +413,9 @@ internal sealed class App : ApplicationContext
 
     static void ApplyAutostart(bool on)
     {
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
-            if (key == null) return;
-            var exe = Environment.ProcessPath ?? "";
-            if (on) key.SetValue("Glyph", $"\"{exe}\"");
-            else if (key.GetValue("Glyph") is string v && v.Contains(Path.GetFileName(exe), StringComparison.OrdinalIgnoreCase)) key.DeleteValue("Glyph", false);
-        }
-        catch (Exception e) { Log.Write("autostart: " + e.Message); }
+        if (Environment.GetEnvironmentVariable("GLYPH_DEV") == "1") return;   // a test build: leave the real Glyph's autostart alone
+        Glyph.Desktop.Autostart.Apply(on);
+        Glyph.Desktop.Autostart.RememberHome();
     }
 
     void Quit()
@@ -421,6 +435,7 @@ internal sealed class App : ApplicationContext
         Hotkeys.Clear();
         DesktopIcons.Restore();
         Taskbar.Restore();
+        Glyph.Data.Tray.Stop();
         shell.DestroyHandle();
         tray.Visible = false;
         tray.Dispose();

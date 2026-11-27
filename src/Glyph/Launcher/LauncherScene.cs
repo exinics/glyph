@@ -25,6 +25,7 @@ internal sealed class LauncherLook
     [DisplayName("Accent colour"), Description("The prompt, the cursor and the letters that matched."), Color, TypeConverter(typeof(ColorNameConverter))] public string AccentColor { get; set; } = "accent";
     [DisplayName("Selected colour"), Description("Behind the selected result."), Color, TypeConverter(typeof(ColorNameConverter))] public string SelectedColor { get; set; } = "accent_dim";
     [DisplayName("Selected text"), Color, TypeConverter(typeof(ColorNameConverter))] public string SelectedText { get; set; } = "bright";
+    [DisplayName("Selected match colour"), Description("The letters you typed, in the selected result. auto = the accent colour, or the selected text colour when the accent would be hard to see on the selected colour."), Color, TypeConverter(typeof(ColorNameConverter))] public string SelectedMatch { get; set; } = "auto";
 
     [Category("Frames"), Description("Smooth style: a frame (Frames page) for the whole launcher instead of the plain box above. none = plain."), TypeConverter(typeof(FrameNameConverter))] public string Frame { get; set; } = "none";
     [Category("Frames"), DisplayName("Row frame"), Description("A frame for each result. none = plain rows."), TypeConverter(typeof(FrameNameConverter))] public string RowFrame { get; set; } = "none";
@@ -37,6 +38,7 @@ internal sealed class LauncherLook
     [Category("Frames"), Description("A big heading above the search line, e.g. APPS. Empty = none.")] public string Heading { get; set; } = "";
     [Category("Frames"), DisplayName("Heading note"), Description("Small text after the heading.")] public string HeadingNote { get; set; } = "";
     [Category("Frames"), DisplayName("Heading font"), Description("Empty = the theme's font."), TypeConverter(typeof(FontNameConverter))] public string HeadingFont { get; set; } = "";
+    [Category("Frames"), DisplayName("Heading colour"), Description("auto = the selected text colour, or the text colour when that would be hard to see on the background."), Color, TypeConverter(typeof(ColorNameConverter))] public string HeadingColor { get; set; } = "auto";
     [Category("Frames"), DisplayName("Top line"), Description("A small line at the very top. {count} = how many results. Empty = none.")] public string TopLine { get; set; } = "";
     [Category("Frames"), DisplayName("Bottom line"), Description("A small line at the bottom, e.g. key hints. {count} = how many results, {selected} = which one is selected. Empty = none.")] public string BottomLine { get; set; } = "";
     [Category("Frames"), DisplayName("Letter spacing"), Description("Extra pixels between letters of the heading, top and bottom lines."), Range(-5, 50)] public float Spacing { get; set; }
@@ -143,7 +145,7 @@ internal sealed class LauncherScene
         {
             var hf = O.HeadingFont.Length > 0 ? O.HeadingFont : font;
             float hw = FramePainter.MeasureText(c, O.Heading, hf, headSize, true, O.Spacing * 2);
-            FramePainter.DrawText(c, O.Heading, x, y, headH, t[O.SelectedText], hf, headSize, true, O.Spacing * 2);
+            FramePainter.DrawText(c, O.Heading, x, y, headH, HeadingCol(), hf, headSize, true, O.Spacing * 2);
             if (O.HeadingNote.Length > 0) FramePainter.DrawText(c, O.HeadingNote, x + hw + fs * 0.8f, y + headH * 0.12f, headH, dim, font, small, false, O.Spacing);
             y += headH;
         }
@@ -289,6 +291,23 @@ internal sealed class LauncherScene
         ContentHeight = panel.Bottom + 6;
     }
 
+    /// True when two colours are too alike to read one on the other.
+    static bool Clash(Rgba a, Rgba b) => Math.Abs(a.Luma - b.Luma) < 0.22f;
+
+    Rgba SelectedMatchCol()
+    {
+        if (O.SelectedMatch != "auto") return Theme[O.SelectedMatch];
+        var acc = Theme[O.AccentColor];
+        return Clash(acc, Theme[O.SelectedColor]) ? Theme[O.SelectedText] : acc;
+    }
+
+    Rgba HeadingCol()
+    {
+        if (O.HeadingColor != "auto") return Theme[O.HeadingColor];
+        var h = Theme[O.SelectedText];
+        return Clash(h, Theme[O.Background]) ? Theme[O.TextColor] : h;
+    }
+
     /// The title with the letters that matched in the accent colour.
     void Title(Canvas c, Item it, float x, float y, float maxW, float fs, bool sel, string font)
     {
@@ -305,7 +324,7 @@ internal sealed class LauncherScene
             var part = text[i..j];
             float w = c.Measure(part, font, fs, h);
             if (cx + w > x + maxW) { c.Text("…", new RectangleF(cx, y, fs * 2, fs * 1.5f), baseCol, font, fs); break; }
-            c.Text(part, new RectangleF(cx, y, w + 4, fs * 1.5f), h ? Theme[O.AccentColor] : baseCol, font, fs, h);
+            c.Text(part, new RectangleF(cx, y, w + 4, fs * 1.5f), h ? (sel ? SelectedMatchCol() : Theme[O.AccentColor]) : baseCol, font, fs, h);
             cx += w;
             i = j;
         }

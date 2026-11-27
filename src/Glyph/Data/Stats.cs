@@ -144,6 +144,7 @@ internal static class Stats
             case "gpu_name": return gpuName.Value;
             case "uptime": return Fmt.Duration(TimeSpan.FromMilliseconds(Environment.TickCount64));
             case "window": return Fmt.Trunc(ActiveWindowTitle(), spec);
+            case "window_app": return Fmt.Trunc(Tasks.ForegroundApp(), spec);
         }
         if (name.StartsWith("media")) return Media.Value(name, spec);
         if (name is "wifi" or "wifi_signal" or "network" or "bluetooth" or "lang" or "lang_full") return Status.Value(name, spec);

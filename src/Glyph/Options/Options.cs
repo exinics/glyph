@@ -156,7 +156,7 @@ internal static class Binder
         foreach (var p in props)
         {
             var line = $"{Key(p).PadRight(w)} = {Value(p.GetValue(o))}";
-            var d = Describe(p);
+            var d = new string(Describe(p).Where(ch => ch >= ' ').ToArray());   // TOML comments can't hold control characters
             var choices = p.GetCustomAttribute<ChoicesAttribute>();
             if (choices != null) d += (d.Length > 0 ? ". " : "") + "One of: " + string.Join(", ", choices.Values);
             var r = p.GetCustomAttribute<RangeAttribute>();
@@ -259,11 +259,12 @@ internal sealed class FrameNameConverter : StringConverter
 internal sealed class FontNameConverter : StringConverter
 {
     static string[]? names;
+    public static void Forget() => names = null;   // fonts were added or removed
     public override bool GetStandardValuesSupported(ITypeDescriptorContext? c) => true;
     public override bool GetStandardValuesExclusive(ITypeDescriptorContext? c) => false;
     public override StandardValuesCollection GetStandardValues(ITypeDescriptorContext? c)
     {
-        names ??= new System.Drawing.Text.InstalledFontCollection().Families.Select(f => f.Name).Prepend("").ToArray();
+        names ??= Glyph.Render.Fonts.FamilyNames().Prepend("").ToArray();   // Windows' fonts + config\fonts
         return new StandardValuesCollection(names);
     }
 }

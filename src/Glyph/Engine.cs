@@ -19,7 +19,6 @@ internal sealed class Engine
     /// Screens (by number) that can't be seen right now, and why (fullscreen app, maximised windows).
     public volatile IReadOnlyDictionary<int, string> Covered = new Dictionary<int, string>();
     public volatile bool UserPaused;
-    public volatile int FpsCap;
     public volatile AppSettings CurrentSettings = new();
     /// The main screen's theme (theme sync, window frames, tiling and the launcher use it).
     public volatile Theme? CurrentTheme;
@@ -37,6 +36,9 @@ internal sealed class Engine
     readonly AutoResetEvent wakeEvent = new(false);
     /// Draw now (e.g. a key was typed in the launcher) instead of at the next frame.
     public void Wake() => wakeEvent.Set();
+
+    /// Draws every screen again on the next frame (e.g. the performance preset changed).
+    public void Redraw() { foreach (var f in surfaces) f.Force = true; wakeEvent.Set(); }
 
     readonly ConcurrentQueue<(int x, int y, bool down)> clicks = new();
     readonly ConcurrentQueue<(int x, int y, int delta)> wheels = new();
@@ -102,7 +104,9 @@ internal sealed class Engine
         public string FontKey = "", LastSig = "";
         public bool Force = true, PauseTrimmed, IdleTrimmed;
         public RectangleF LastArea;
-        public double Last, Time, PausedAt = -1, LastDrawAt;
+        public double Last, Time, PausedAt = -1, LastDrawAt, LastFullAt, RefreshAt = -1;
+        public int RefreshHz = 60;
+        public bool FullPending;   // dragging a box: the desktop itself wants a redraw, waiting for its turn
         // bar
         public Renderer? BarR;
         public readonly Grid BarGrid = new();
@@ -167,6 +171,8 @@ internal sealed class Engine
         c.BackgroundAction = a => DoAction?.Invoke(a);
     }
 
+    int selFrames, selFull, loops, lastDeskFps; readonly double[] selMs = new double[3]; double loopMs;
+
     void Run()
     {
         var timer = Native.CreateWaitableTimerExW(IntPtr.Zero, null, Native.CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, Native.TIMER_ALL_ACCESS);
@@ -178,6 +184,7 @@ internal sealed class Engine
         while (!stop)
         {
             double now = clock.Elapsed.TotalSeconds;
+            if (Log.Debug) { loops++; }
             int fps = 15;
             bool allResting = true, launcherOpen = false;
             try
@@ -232,12 +239,15 @@ internal sealed class Engine
                     if (!desktopPaused && !f.IdleTrimmed && now - f.LastDrawAt > 60) { f.IdleTrimmed = true; Native.TrimMemory(); Log.D("trimmed memory (idle)"); }
                 }
                 launcherOpen = surfaces.Length > 0 && LauncherStep(surfaces[0].Comp);
+                if (Log.Debug) loopMs += (clock.Elapsed.TotalSeconds - now) * 1000;
 
                 if (trimAt > 0 && now >= trimAt && (!surfaces.Any(f => f.Comp.Widgets.Any(w => w.Animated)) || now >= trimAt + 20)) { trimAt = -1; Native.TrimMemory(); Log.D("trimmed memory"); }
                 if (Log.Debug && now - memT >= 15) { memT = now; LogMemory(); }
                 if (now - statT >= 2)
                 {
                     Fps = (float)(statFrames / (now - statT)); FrameMs = 0;
+                    if (Log.Debug) Log.D($"{Fps:0} frames/s, preset {Perf.Name} (desktop {lastDeskFps}, effects {(Perf.Current.Effects ? "on" : "off")}, detail {Perf.Current.AnimationDetail})" + (selFrames > 0 ? $"; box: {selFrames} frames, {selFull} full, ms each: full {selMs[0] / Math.Max(1, selFull):0.0}, box {selMs[1] / selFrames:0.00}, present {selMs[2] / selFrames:0.0}; loop {loopMs / Math.Max(1, loops):0.0} ms x {loops}" : ""));
+                    selFrames = selFull = 0; selMs[0] = selMs[1] = selMs[2] = 0; loopMs = 0; loops = 0;
                     statT = now; statFrames = 0;
                 }
                 if ((allResting || surfaces.Length == 0) && !launcherOpen) { wakeEvent.WaitOne(100); continue; }
@@ -257,7 +267,8 @@ internal sealed class Engine
                 continue;
             }
 
-            if (FpsCap > 0) fps = Math.Min(fps, FpsCap);
+            // the launcher follows the hand: with Smooth dragging it runs at the screen's refresh rate
+            if (launcherOpen && Perf.Current.SmoothDragging && surfaces.Length > 0) fps = Math.Max(fps, Refresh(surfaces[0], now));
             double wait = now + 1.0 / Math.Max(1, fps) - clock.Elapsed.TotalSeconds;
             if (wait > 0.0005)
             {
@@ -322,21 +333,59 @@ internal sealed class Engine
         var sig = comp.Signature();
         bool changed = sig != f.LastSig;
         f.LastSig = sig;
-        bool draw = f.Force || resized || hoverChanged || clicked || animated || changed || selChanged || (moved && here && (comp.Scene.CursorOn || comp.Scene.Parallax));
+        bool mouseLook = moved && here && (comp.Scene.CursorOn || comp.Scene.Parallax);
+        int refresh = Refresh(f, now);
+        int deskFps = Math.Max(1, Perf.Current.FrameRate(refresh, comp.Scene.Fps));
+        lastDeskFps = deskFps;
+        bool draw = f.Force || resized || hoverChanged || clicked || animated || changed || selChanged || mouseLook;
 
-        int fps = comp.Selecting ? 60 : animated || comp.Scene.CursorOn ? comp.Scene.Fps : 15;
+        // Dragging a selection box in a smooth theme: the box is drawn over a kept copy of the desktop as often
+        // as the screen shows frames; the desktop under it is only redrawn at its own frame rate. (Drawing the
+        // whole desktop for every mouse move is close to a full frame's time on a laptop, so frames got dropped.)
+        if (comp.SmoothSelecting)
+        {
+            comp.SelectionApart = true;
+            if (hoverChanged || animated || changed || mouseLook) f.FullPending = true;
+            bool full = f.Force || resized || clicked || !r.HasStill || (f.FullPending && now - f.LastFullAt >= 1.0 / deskFps);
+            int boxFps = Perf.Current.SmoothDragging ? 240 : deskFps;   // 240: the swap chain waits for the screen, so it's the refresh rate
+            if (!full && !selChanged) { f.Last = now; return (false, boxFps); }
+            long t0 = Stopwatch.GetTimestamp();
+            if (full) { FullFrame(f, comp, r, now, rc, mx, my, area); r.KeepStill(); f.FullPending = false; f.LastFullAt = now; }
+            long t1 = Stopwatch.GetTimestamp();
+            r.DrawOver(comp.Scaled(comp.DrawSelection), fromStill: !full);
+            long t2 = Stopwatch.GetTimestamp();
+            if (!r.Present()) { Log.Write("graphics device lost; rebuilding"); r.Dispose(); f.R = null; }
+            if (Log.Debug) { selFull += full ? 1 : 0; selFrames++; selMs[0] += (t1 - t0) * 1000.0 / Stopwatch.Frequency; selMs[1] += (t2 - t1) * 1000.0 / Stopwatch.Frequency; selMs[2] += (Stopwatch.GetTimestamp() - t2) * 1000.0 / Stopwatch.Frequency; }
+            return (true, boxFps);
+        }
+        if (comp.SelectionApart) { comp.SelectionApart = false; f.FullPending = false; r.DropStill(); draw = true; }
+
+        // nothing moving: still look at the mouse often enough for hover and the mouse glow to answer quickly
+        int fps = animated || comp.Scene.CursorOn ? deskFps : Perf.Current.Fps.Trim() == "max" ? refresh : Math.Min(deskFps, 15);
         if (!draw) { f.Last = now; return (false, fps); }
 
+        FullFrame(f, comp, r, now, rc, mx, my, area);
+        if (!r.Present()) { Log.Write("graphics device lost; rebuilding"); r.Dispose(); f.R = null; }
+        return (true, fps);
+    }
+
+    /// The screen's refresh rate (looked up every few seconds: it can change in Windows' display settings).
+    static int Refresh(Surface f, double now)
+    {
+        if (f.RefreshAt < 0 || now - f.RefreshAt > 5) { f.RefreshHz = Screens.RefreshRate(f.S); f.RefreshAt = now; }
+        return f.RefreshHz;
+    }
+
+    static void FullFrame(Surface f, Composer comp, Renderer r, double now, Native.RECT rc, float mx, float my, RectangleF area)
+    {
         f.Force = false;
         float dt = (float)Math.Min(0.1, now - f.Last);
         f.Last = now; f.Time += dt;
         r.Resize(rc.Width, rc.Height);
         var atlas = r.Atlas!;
         comp.Compose(r.Width, r.Height, atlas.CellW, atlas.CellH, (float)f.Time, dt, mx, my, area);
-        r.Draw(comp.Grid, comp.Effects, (float)f.Time, comp.ClearColor,
+        r.Draw(comp.Grid, Perf.Current.Effects ? comp.Effects : Perf.NoEffects, (float)f.Time, comp.ClearColor,
             comp.HasBackdrop ? comp.Scaled(comp.DrawBackdrop) : null, comp.HasVectorLayer ? comp.Scaled(comp.DrawWidgets) : null);
-        if (!r.Present()) { Log.Write("graphics device lost; rebuilding"); r.Dispose(); f.R = null; }
-        return (true, fps);
     }
 
     void BarStep(Surface f)

@@ -12,7 +12,7 @@ internal static class Taskbar
     const int ABS_AUTOHIDE = 1, ABS_ALWAYSONTOP = 2;
     const string Marker = "taskbar_autohide_by_glyph";
 
-    static APPBARDATA Data() => new() { cbSize = Marshal.SizeOf<APPBARDATA>(), hWnd = Native.FindWindow("Shell_TrayWnd", null) };
+    static APPBARDATA Data() => new() { cbSize = Marshal.SizeOf<APPBARDATA>(), hWnd = Glyph.Data.Tray.ExplorerTray() };
 
     static bool AutoHide
     {
@@ -37,7 +37,7 @@ internal static class Taskbar
 
     static IEnumerable<IntPtr> Bars()
     {
-        var main = Native.FindWindow("Shell_TrayWnd", null);
+        var main = Glyph.Data.Tray.ExplorerTray();
         if (main != IntPtr.Zero) yield return main;
         IntPtr h = IntPtr.Zero;
         while ((h = Native.FindWindowEx(IntPtr.Zero, h, "Shell_SecondaryTrayWnd", null)) != IntPtr.Zero) yield return h;

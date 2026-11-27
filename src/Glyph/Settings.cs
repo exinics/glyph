@@ -50,6 +50,9 @@ internal sealed class AppSettings
         var s = new AppSettings();
         var file = ConfigFile.Load(FilePath, problems);
         Binder.Read(s, file.Top, null);
+        s.Performance.ReadOld(file.Top.Sub("performance", "[performance]"));
+        foreach (var (name, pr) in new[] { ("highest", s.Performance.Highest), ("balanced", s.Performance.Balanced), ("low", s.Performance.Low) })
+            if (!PresetOptions.ValidFps(pr.Fps)) { problems.Add($"glyph.toml [performance.{name}]: fps \"{pr.Fps}\" should be max, theme or a number from 1 to 240"); pr.Fps = "theme"; }
         file.ReportUnknown();
         return s;
     }
@@ -66,22 +69,83 @@ internal sealed class AppSettings
     }
 }
 
+/// glyph.toml [performance]: which preset runs when (plugged in, on battery, battery saver), the presets
+/// themselves, and when Glyph rests completely.
 internal sealed class PerformanceOptions
 {
+    static readonly string[] Modes = { "highest", "balanced", "low", "pause" };
+
+    [DisplayName("Plugged in"), Description("Preset while the PC runs on mains power (a desktop PC always uses this). pause = don't draw at all."), Choices("highest", "balanced", "low", "pause"), TypeConverter(typeof(ChoicesConverter))]
+    public string PluggedIn { get; set; } = "highest";
+
+    [DisplayName("On battery"), Description("Preset while unplugged."), Choices("highest", "balanced", "low", "pause"), TypeConverter(typeof(ChoicesConverter))]
+    public string OnBattery { get; set; } = "balanced";
+
+    [DisplayName("Battery saver"), Description("Preset while Windows battery saver (energy saver) is on."), Choices("highest", "balanced", "low", "pause"), TypeConverter(typeof(ChoicesConverter))]
+    public string BatterySaver { get; set; } = "pause";
+
     [DisplayName("Pause when fullscreen"), Description("Stop drawing while a game or video is fullscreen.")]
     public bool PauseWhenFullscreen { get; set; } = true;
 
     [DisplayName("Pause when maximised"), Description("Stop drawing while maximised windows cover the desktop.")]
     public bool PauseWhenMaximized { get; set; } = true;
 
-    [DisplayName("Pause on battery saver"), Description("Stop drawing while Windows battery saver is on.")]
-    public bool PauseOnBatterySaver { get; set; } = true;
-
     [DisplayName("Pause when locked"), Description("Stop drawing on the lock screen.")]
     public bool PauseWhenLocked { get; set; } = true;
 
-    [DisplayName("Frame rate on battery"), Description("Frame rate limit when unplugged. 0 = no limit."), Range(0, 240)]
-    public int BatteryFps { get; set; } = 15;
+    [Section, DisplayName("Highest"), Description("Preset: everything at the screen's full frame rate and full quality"), TypeConverter(typeof(SectionConverter))]
+    public PresetOptions Highest { get; set; } = PresetOptions.MakeHighest();
+
+    [Section, DisplayName("Balanced"), Description("Preset: each theme as it's made"), TypeConverter(typeof(SectionConverter))]
+    public PresetOptions Balanced { get; set; } = PresetOptions.MakeBalanced();
+
+    [Section, DisplayName("Low"), Description("Preset: slow and simple, for the longest battery"), TypeConverter(typeof(SectionConverter))]
+    public PresetOptions Low { get; set; } = PresetOptions.MakeLow();
+
+    public PresetOptions? Preset(string mode) => mode switch { "highest" => Highest, "balanced" => Balanced, "low" => Low, _ => null };
+
+    /// Settings from before presets: pause_on_battery_saver becomes the battery saver choice; the old battery
+    /// frame rate options are replaced by the presets.
+    public void ReadOld(Node? n)
+    {
+        if (n == null) return;
+        if (n.Has("pause_on_battery_saver") && !n.Has("battery_saver")) BatterySaver = n.Bool("pause_on_battery_saver", true) ? "pause" : "low";
+        else if (n.Has("pause_on_battery_saver")) n.Bool("pause_on_battery_saver", true);
+        if (n.Has("battery_fps")) n.Int("battery_fps", 15);
+        if (n.Has("battery_limits_dragging")) n.Bool("battery_limits_dragging", false);
+    }
+}
+
+/// One performance preset (glyph.toml [performance.highest] / .balanced / .low). Each value overrides what
+/// the theme says while the preset is in use.
+internal sealed class PresetOptions
+{
+    [DisplayName("Frame rate"), Description("max = as fast as the screen shows frames (its refresh rate, e.g. 60 or 144), whatever the theme says. theme = each theme's own frame rate. A number = the theme's frame rate, but no more than this.")]
+    public string Fps { get; set; } = "max";
+
+    [DisplayName("Screen effects"), Description("Draw the theme's screen effects (bloom, scanlines, curvature...). Off saves the most work for the graphics chip.")]
+    public bool Effects { get; set; } = true;
+
+    [DisplayName("Animation detail"), Description("max = smoke/noise worked out fresh every frame and videos at their own full frame rate. theme = as each theme sets them. low = smoke worked out half as often, videos at most 15 frames a second."), Choices("max", "theme", "low"), TypeConverter(typeof(ChoicesConverter))]
+    public string AnimationDetail { get; set; } = "max";
+
+    [DisplayName("Smooth dragging"), Description("The selection box and the launcher run at the screen's refresh rate even when the frame rate above is lower (drawing them costs next to nothing). Off = they keep to the frame rate above.")]
+    public bool SmoothDragging { get; set; } = true;
+
+    public static PresetOptions MakeHighest() => new();
+    public static PresetOptions MakeBalanced() => new() { Fps = "theme", AnimationDetail = "theme" };
+    public static PresetOptions MakeLow() => new() { Fps = "15", Effects = false, AnimationDetail = "low", SmoothDragging = false };
+
+    /// The frame rate to draw at: `screen` = the display's refresh rate, `theme` = the theme's own.
+    public int FrameRate(int screen, int theme)
+    {
+        var v = Fps.Trim().ToLowerInvariant();
+        if (v == "max") return Math.Max(1, screen);
+        if (int.TryParse(v, out int n) && n > 0) return Math.Min(theme, n);
+        return theme;
+    }
+
+    public static bool ValidFps(string v) => v.Trim().ToLowerInvariant() is "max" or "theme" || (int.TryParse(v.Trim(), out int n) && n is >= 1 and <= 240);
 }
 
 /// Screen effects drawn over everything.

@@ -61,10 +61,23 @@ internal sealed partial class SettingsForm : Form
     // General
     readonly PropertyGrid appGrid = Grid();
 
-    static PropertyGrid Grid() => new() { Dock = DockStyle.Fill, ToolbarVisible = false, PropertySort = PropertySort.Categorized, HelpVisible = true };
+    static PropertyGrid Grid()
+    {
+        var g = new PropertyGrid { Dock = DockStyle.Fill, ToolbarVisible = false, PropertySort = PropertySort.Categorized, HelpVisible = true };
+        Friendly.Style(g);
+        return g;
+    }
 
     public SettingsForm(string? startPage = null)
     {
+        Friendly.Register();
+        Glyph.UI.Swatch.Resolve = name =>
+        {
+            if (theme == null || name is "" or "none" or "auto") return null;
+            if (Rgba.TryParseHex(name, out var hx)) return Color.FromArgb(hx.R, hx.G, hx.B);
+            int i = theme.PaletteList.FindIndex(p => p.name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            return i < 0 ? null : Color.FromArgb(theme.PaletteList[i].color.R, theme.PaletteList[i].color.G, theme.PaletteList[i].color.B);
+        };
         Text = "Glyph settings";
         Width = 1440; Height = 880; MinimumSize = new Size(980, 640);
         StartPosition = FormStartPosition.CenterScreen;
@@ -89,6 +102,8 @@ internal sealed partial class SettingsForm : Form
         AddPage("Widgets", "Widgets", BuildWidgets());
         AddPage("Bar", "Bar", BuildBar());
         AddPage("Wallpaper", "Wallpaper", BuildWallpaper());
+        AddPage("Icons", "Icons", BuildIcons());
+        AddPage("Fonts", "Fonts", BuildFonts());
         AddPage("Frames", "Frames", BuildFrames());
         AddPage("Look", "Colours & look", BuildLook());
         AddPage("Design", "Design", BuildDesign());
@@ -235,6 +250,7 @@ internal sealed partial class SettingsForm : Form
         var problems = new List<string>();
         app = AppSettings.Load(problems);
         shortcuts = ShortcutStore.Load(problems);
+        groups = ShortcutStore.Groups.ToList();
         hotkeys = HotkeyStore.Load(problems);
         RefreshHotkeys();
         RefreshThemeList();
@@ -259,6 +275,8 @@ internal sealed partial class SettingsForm : Form
         theme = Theme.Load(name, problems);
         wallpaper = WallpaperOptions.Load(theme, problems);
         widgets = WidgetsFile.Load(theme, problems);
+        anims = Glyph.Render.AnimationsFile.Load(theme, problems);
+        dirtyAnims = false;
         bar = File.Exists(BarFile.FilePath(name)) ? BarFile.Load(theme, problems) : new BarFile { Bar = { Enabled = false } };
         ColorNameConverter.Names = theme.PaletteList.Select(p => p.name).Append("none").Append("auto").ToArray();
         editing.Text = $"Editing theme \"{name}\"" + (name == app.Theme ? "   ·   in use on the desktop" : "   ·   not in use (Themes > Use this theme)");
@@ -364,11 +382,12 @@ internal sealed partial class SettingsForm : Form
                 if (dirtyWallpaper) { Clamp(wallpaper); foreach (var l in wallpaper.Layers) Clamp(l); wallpaper.Save(themeName); dirtyWallpaper = false; }
                 if (dirtyWidgets) { foreach (var w in widgets.Widgets) Clamp(w); widgets.Save(themeName); dirtyWidgets = false; }
                 if (dirtyBar) { Clamp(bar.Bar); foreach (var m in bar.Left.Concat(bar.Center).Concat(bar.Right)) Clamp(m); bar.Save(themeName); dirtyBar = false; }
+                if (dirtyAnims) { anims.Save(themeName); dirtyAnims = false; }
                 if (dirtyVariables) { Glyph.Data.Variables.Save(themeName, variables); Glyph.Data.Variables.Use(variables); dirtyVariables = false; }
                 SaveFrames();
                 preview?.Reload();
             }
-            if (dirtyShortcuts) { ShortcutStore.Save(shortcuts); dirtyShortcuts = false; }
+            if (dirtyShortcuts) { ShortcutStore.Groups = groups.ToList(); ShortcutStore.Save(shortcuts); dirtyShortcuts = false; }
             if (dirtyHotkeys) { HotkeyStore.Save(hotkeys); dirtyHotkeys = false; }
         }
         catch (Exception e) { status.Text = "Couldn't save: " + e.Message; }
@@ -788,7 +807,7 @@ internal sealed partial class SettingsForm : Form
         scList.Columns.Add("Group", 90);
         scList.Columns.Add("Opens", 320);
         scList.SmallImageList = scIcons;
-        var buttons = Buttons(92);
+        var buttons = Buttons(134);
         Btn(buttons, "Add program or file…", AddFile, true);
         Btn(buttons, "Add folder…", AddFolder);
         Btn(buttons, "Add website…", AddWebsite);
@@ -798,6 +817,7 @@ internal sealed partial class SettingsForm : Form
         Btn(buttons, "Move down", () => MoveShortcut(1));
         Btn(buttons, "Set picture…", SetPicture);
         Btn(buttons, "Use app's own icon", () => { if (SelectedShortcut() is Shortcut s) { s.Image = ""; AfterShortcuts(s); } });
+        Btn(buttons, "Groups (menu tabs)…", EditGroups);
         split.Panel1.Controls.Add(scList);
         split.Panel1.Controls.Add(Hint("Your shortcuts (shared by every theme). Shortcuts widgets show them on the desktop."));
         split.Panel1.Controls.Add(hideIcons);

@@ -51,8 +51,29 @@ internal abstract class PanelWidget : Widget
 
     void Scale(WidgetEnv e) => e.Painter.FontSize = e.BaseFontSize * P.Scale;
 
+    WidgetEnv? layoutEnv;
+
+    public override IEnumerable<Part> Parts()
+    {
+        if (!visible || root == null || Bounds.IsEmpty) yield break;
+        var own = new[] { "*own", "Colours" };
+        yield return new Part("Box", Bounds, new[] { "Placement", "Box", "Panel", "Link" }, P.Panel ? "Frame" : "");
+        var env = layoutEnv;
+        if (env == null) yield break;
+        var content = PxRect(root, env);
+        if (title.Length > 0)
+        {
+            float top = content.Y - Bounds.Y;
+            if (top > 4) yield return new Part("Title", new RectangleF(Bounds.X, Bounds.Y, Bounds.Width, top), new[] { "Panel", "Colours" }, P.Panel ? "Frame" : "");
+        }
+        yield return new Part("Contents", content, own);
+        foreach (var k in clickables)
+            if (k is ButtonEl) yield return new Part("Buttons", PxRect(k, env), own, "theme:ButtonFrame");
+    }
+
     public override void Layout(WidgetEnv e)
     {
+        layoutEnv = e;
         var p = e.Painter;
         Scale(e);
         root = Build(e);
@@ -66,13 +87,14 @@ internal abstract class PanelWidget : Widget
             int padX = P.Panel ? 2 : 0, padY = P.Panel ? 1 : 0;
             titleRow = !P.Panel && title.Length > 0 ? 1 : 0;
             int cw = (int)Math.Ceiling(mw);
-            if (P.Width > 0) cw = Math.Max(cw, (int)Math.Round(P.Width / (float)e.CellW) - 2 * padX);
+            float wantW = WantW(P, P.Width, e), wantH = WantH(P, P.Height, e);
+            if (wantW > 0) cw = Math.Max(cw, (int)Math.Round(wantW / (float)e.CellW) - 2 * padX);
             if (title.Length > 0) cw = Math.Max(cw, title.Length + (P.Panel ? 6 : 0) - 2 * padX);
             wc = cw + 2 * padX; hc = (int)Math.Ceiling(mh) + 2 * padY + titleRow;
-            int wantH = P.Height > 0 ? (int)Math.Round(P.Height / (float)e.CellH) : 0;
-            int extraRows = Math.Max(0, wantH - hc);
+            int wantRows = wantH > 0 ? (int)Math.Round(wantH / (float)e.CellH) : 0;
+            int extraRows = Math.Max(0, wantRows - hc);
             hc += extraRows;
-            var pt = Place(P.Anchor, wc * e.CellW, hc * e.CellH, e.Area, P.OffsetX, P.OffsetY);
+            var pt = PlaceFor(P, wc * e.CellW, hc * e.CellH, e.Area);
             cx0 = (int)MathF.Round(pt.X / e.CellW); cy0 = (int)MathF.Round(pt.Y / e.CellH);
             Bounds = new RectangleF(cx0 * e.CellW, cy0 * e.CellH, wc * e.CellW, hc * e.CellH);
             int shift = P.VerticalAlign == "center" ? extraRows / 2 : P.VerticalAlign == "bottom" ? extraRows : 0;
@@ -81,8 +103,8 @@ internal abstract class PanelWidget : Widget
         else if (frame != null && e.Canvas != null)
         {
             var ins = FramePainter.Space(frame, T, p.FontSize, title.Length > 0);
-            float cw = mw;
-            if (P.Width > 0) cw = Math.Max(cw, P.Width - ins.L - ins.R);
+            float cw = mw, wantW = WantW(P, P.Width, e), wantH = WantH(P, P.Height, e);
+            if (wantW > 0) cw = Math.Max(cw, wantW - ins.L - ins.R);
             if (title.Length > 0)
             {
                 var tt = frame.TitleUpper ? title.ToUpperInvariant() : title;
@@ -92,10 +114,10 @@ internal abstract class PanelWidget : Widget
                 if (frame.Header == "tab") tw = frame.TabWidth > 0 ? frame.TabWidth : tw + 2 * Math.Max(8, ins.L) + frame.TabSlant;
                 if (frame.Header != "above") cw = Math.Max(cw, tw - (frame.Header == "tab" ? ins.L + ins.R : 0));   // an above-title may run past the box
             }
-            float hh = Math.Max(mh + ins.T + ins.B, P.Height);
+            float hh = Math.Max(mh + ins.T + ins.B, wantH);
             float extra = hh - (mh + ins.T + ins.B);
             var size = new SizeF(cw + ins.L + ins.R, hh);
-            var pt = Place(P.Anchor, size.Width, size.Height, e.Area, P.OffsetX, P.OffsetY);
+            var pt = PlaceFor(P, size.Width, size.Height, e.Area);
             Bounds = new RectangleF(pt, size);
             float shiftY = P.VerticalAlign == "center" ? extra / 2 : P.VerticalAlign == "bottom" ? extra : 0;
             p.Arrange(root, pt.X + ins.L, pt.Y + ins.T + shiftY, cw);
@@ -105,12 +127,12 @@ internal abstract class PanelWidget : Widget
             var ui = T.Options.Ui;
             pad = P.Panel ? ui.Padding : 0;
             titleH = title.Length > 0 ? p.LineH(TextSize.Title) * 1.25f : 0;
-            float cw = mw;
-            if (P.Width > 0) cw = Math.Max(cw, P.Width - 2 * pad);
+            float cw = mw, wantW = WantW(P, P.Width, e), wantH = WantH(P, P.Height, e);
+            if (wantW > 0) cw = Math.Max(cw, wantW - 2 * pad);
             if (title.Length > 0 && e.Canvas != null) cw = Math.Max(cw, e.Canvas.Measure(title, p.Font, p.Px(TextSize.Title), true));
-            var size = new SizeF(cw + 2 * pad, Math.Max(mh + 2 * pad + titleH, P.Height));
+            var size = new SizeF(cw + 2 * pad, Math.Max(mh + 2 * pad + titleH, wantH));
             float extra = size.Height - (mh + 2 * pad + titleH);
-            var pt = Place(P.Anchor, size.Width, size.Height, e.Area, P.OffsetX, P.OffsetY);
+            var pt = PlaceFor(P, size.Width, size.Height, e.Area);
             Bounds = new RectangleF(pt, size);
             float shiftY = P.VerticalAlign == "center" ? extra / 2 : P.VerticalAlign == "bottom" ? extra : 0;
             p.Arrange(root, pt.X + pad, pt.Y + pad + titleH + shiftY, cw);
@@ -240,12 +262,13 @@ internal sealed class ClockWidget : PanelWidget
         col.Items.Add(new BigEl
         {
             Text = V(o.Format), Color = Accent, Pixel = o.Pixel, HasShadow = o.Shadow != "none", Shadow = T[o.Shadow],
-            Scale = o.BigScale, Font = o.BigFont, Align = o.Align,
+            Scale = o.BigScale, Font = o.BigFont, Align = o.Align, Spacing = o.Spacing,
         });
         if (o.Subtitle.Length > 0)
         {
             if (e.Painter.Terminal) col.Items.Add(new GapEl(0.6f));
-            col.Items.Add(new TextEl { Spans = S(o.Subtitle, Text), Size = TextSize.Large, Align = o.Align });
+            var size = o.SubtitleSize switch { "small" => TextSize.Small, "normal" => TextSize.Normal, _ => TextSize.Large };
+            col.Items.Add(new TextEl { Spans = S(o.Subtitle, o.SubtitleColor == "auto" ? Text : T[o.SubtitleColor]), Size = size, Align = o.Align, Spacing = o.SubtitleSpacing });
         }
         return col;
     }
@@ -343,9 +366,10 @@ internal sealed class MediaWidget : PanelWidget
         {
             var buttons = new RowEl { Gap = 1 };
             var bf = ButtonFrame;
-            buttons.Items.Add(new ButtonEl { Label = bf != null ? "⏮" : "◀◀", Action = "media:prev", Color = Text, Hover = Accent, Frame = bf });
-            buttons.Items.Add(new ButtonEl { Label = Media.Playing ? (bf != null ? "⏸" : "❚❚") : "▶", Action = "media:toggle", Color = Text, Hover = Accent, Frame = bf });
-            buttons.Items.Add(new ButtonEl { Label = bf != null ? "⏭" : "▶▶", Action = "media:next", Color = Text, Hover = Accent, Frame = bf });
+            static string L(string own, string builtIn) => own.Length > 0 ? Glyph.Render.Symbols.Expand(own) : builtIn;
+            buttons.Items.Add(new ButtonEl { Label = L(o.PrevLabel, bf != null ? "⏮" : "◀◀"), Action = "media:prev", Color = Text, Hover = Accent, Frame = bf });
+            buttons.Items.Add(new ButtonEl { Label = Media.Playing ? L(o.PauseLabel, bf != null ? "⏸" : "❚❚") : L(o.PlayLabel, "▶"), Action = "media:toggle", Color = Text, Hover = Accent, Frame = bf });
+            buttons.Items.Add(new ButtonEl { Label = L(o.NextLabel, bf != null ? "⏭" : "▶▶"), Action = "media:next", Color = Text, Hover = Accent, Frame = bf });
             info.Items.Add(new GapEl(term ? 0 : 0.3f));
             info.Items.Add(buttons);
         }
@@ -528,7 +552,11 @@ internal sealed class TextWidget : PanelWidget
         var size = o.Size switch { "small" => TextSize.Small, "large" => TextSize.Large, "title" => TextSize.Title, _ => TextSize.Normal };
         var col = new ColEl();
         foreach (var line in Fmt.Lines(S(o.Text, Text)))
-            col.Items.Add(new TextEl { Spans = line, Size = size, Align = o.Align, Mono = o.Mono });
+            col.Items.Add(new TextEl
+            {
+                Spans = line, Size = size, Align = o.Align, Mono = o.Mono, Spacing = o.Spacing,
+                Shadow = o.TextShadow != "none" ? T[o.TextShadow] : null, ShadowX = o.ShadowOffset, ShadowY = o.ShadowOffset,
+            });
         return col;
     }
 }

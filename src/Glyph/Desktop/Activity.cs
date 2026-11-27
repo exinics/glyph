@@ -10,15 +10,15 @@ internal static class Activity
 
     public static volatile bool Locked;
 
-    /// Why every screen should rest (locked, battery saver), or "".
-    public static string Reason(PerformanceOptions s, out int fpsCap)
+    /// Why every screen should rest (locked, a power state set to pause), or "". `mode` = the preset for the
+    /// power state now: highest, balanced, low or pause.
+    public static string Reason(PerformanceOptions s, out string mode)
     {
-        fpsCap = 0;
         Native.GetSystemPowerStatus(out var power);
-        bool onBattery = power.ACLineStatus == 0;
-        if (onBattery && s.BatteryFps > 0) fpsCap = s.BatteryFps;
+        bool saver = power.SystemStatusFlag == 1, onBattery = power.ACLineStatus == 0;
+        mode = saver ? s.BatterySaver : onBattery ? s.OnBattery : s.PluggedIn;
         if (s.PauseWhenLocked && Locked) return "locked";
-        if (s.PauseOnBatterySaver && power.SystemStatusFlag == 1) return "battery saver";
+        if (mode == "pause") return saver ? "battery saver" : onBattery ? "on battery" : "plugged in";
         return "";
     }
 

@@ -114,6 +114,7 @@ internal sealed partial class SettingsForm
         if (Is(ui.PanelFrame)) uses.Add("every panel (Panel frame)");
         if (Is(ui.ButtonFrame)) uses.Add("buttons");
         foreach (var w in widgets.Widgets) if (Is(w.Frame)) uses.Add($"widget \"{w}\"");
+        uses.AddRange(FrameUsers(name));
         if (Is(bar.Bar.Frame)) uses.Add("the bar");
         if (Is(bar.Bar.ModuleFrame)) uses.Add("bar modules");
         foreach (var m in bar.Left.Concat(bar.Center).Concat(bar.Right))

@@ -19,6 +19,11 @@ internal sealed class WidgetEnv
     public float BaseFontSize = 13;
 }
 
+/// One clickable part of a widget for the Design page: where it is, which option categories belong to it
+/// (null = all of them; "*own" = the widget type's own categories) and which option names its frame
+/// ("" = none; "theme:ButtonFrame" = the theme's button frame).
+internal sealed record Part(string Name, RectangleF Rect, string[]? Categories, string FrameProp = "");
+
 /// A panel on the desktop. Terminal themes draw it with characters (DrawCells),
 /// smooth themes with shapes and text (DrawVector).
 internal abstract class Widget : IDisposable
@@ -38,6 +43,11 @@ internal abstract class Widget : IDisposable
     public virtual void Click(int item, int count, WidgetEnv e) { }
     /// The mouse wheel over it. Returns true if it used it.
     public virtual bool Wheel(float x, float y, int delta, WidgetEnv e) => false;
+    /// The parts the Design page can pick (smallest under the mouse wins).
+    public virtual IEnumerable<Part> Parts() => new[] { new Part("Box", Bounds, new[] { "Placement", "Box", "Link", "*own" }, "Frame") };
+
+    /// True if the point is on this panel (empty desktop otherwise: clicks and drags there go to the background).
+    public virtual bool Covers(float x, float y) => Bounds.Contains(x, y);
     public virtual void Dispose() { }
     /// Describes what it would show right now; when this changes, the desktop redraws.
     public virtual string Signature(WidgetEnv e) => Hover.ToString();
@@ -48,6 +58,19 @@ internal abstract class Widget : IDisposable
         float x = anchor.EndsWith("left") || anchor == "left" ? a.X + ox : anchor.EndsWith("right") || anchor == "right" ? a.Right - w - ox : a.X + (a.Width - w) / 2 + ox;
         float y = anchor.StartsWith("top") ? a.Y + oy : anchor.StartsWith("bottom") ? a.Bottom - h - oy : a.Y + (a.Height - h) / 2 + oy;
         return new PointF(x, y);
+    }
+
+    /// Width / height the options ask for: Stretch fills the screen between the offsets, else Width/Height (0 = fit).
+    protected static float WantW(WidgetOptions o, float own, WidgetEnv e) => o.StretchW ? Math.Max(1, e.Area.Width - 2 * o.OffsetX) : own;
+    protected static float WantH(WidgetOptions o, float own, WidgetEnv e) => o.StretchH ? Math.Max(1, e.Area.Height - 2 * o.OffsetY) : own;
+
+    /// Place, keeping a stretched side against both edges.
+    protected static PointF PlaceFor(WidgetOptions o, float w, float h, RectangleF a)
+    {
+        var pt = Place(o.Anchor, w, h, a, o.OffsetX, o.OffsetY);
+        if (o.StretchW) pt.X = a.X + o.OffsetX;
+        if (o.StretchH) pt.Y = a.Y + o.OffsetY;
+        return pt;
     }
 
     public static Widget Create(WidgetOptions o, Theme theme, List<Shortcut> shortcuts, List<string> problems)
@@ -72,6 +95,8 @@ internal abstract class Widget : IDisposable
         VideoOptions v => new VideoWidget(v, theme),
         AudioOptions au => new AudioWidget(au, theme),
         FeedOptions fd => new FeedWidget(fd, theme),
+        MenuOptions mn => new MenuWidget(mn, theme, shortcuts),
+        DividerOptions dv => new DividerWidget(dv, theme),
         _ => throw new ArgumentException("unknown widget " + o.Type),
     };
 }

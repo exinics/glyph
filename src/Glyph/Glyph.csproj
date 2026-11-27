@@ -9,7 +9,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>Glyph</AssemblyName>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <ApplicationIcon>glyph.ico</ApplicationIcon>
     <RootNamespace>Glyph</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
@@ -31,6 +31,8 @@
   <ItemGroup>
     <!-- the theme that comes with Glyph: copied into config\themes on first run only -->
     <Content Include="..\..\themes\**\*" Link="themes\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- Google's Material Symbols (Apache 2.0): the icon font for {icon:name}, and its list of names -->
+    <Content Include="..\..\fonts\**\*" Link="fonts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />

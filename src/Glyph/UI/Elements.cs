@@ -28,6 +28,8 @@ internal sealed class TextEl : El
     public bool Bold, Mono, Tight;
     public float Spacing;               // smooth style: extra pixels between letters
     public Rgba? Background;            // a pill behind the text (bar modules)
+    public Rgba? Shadow;                // smooth style: the text again, offset a little, under it
+    public float ShadowX = 2, ShadowY = 2;
     public TextEl() { }
     public TextEl(string text, Rgba color, TextSize size = TextSize.Normal) { Spans.Add(new Span(text, color)); Size = size; }
     public string Plain => string.Concat(Spans.Select(s => s.Text));
@@ -44,6 +46,7 @@ internal sealed class BigEl : El
     public float Scale = 4f;
     public string Font = "";
     public string Align = "center";
+    public float Spacing;               // smooth style: extra pixels between letters
     public override void Sig(StringBuilder sb) => sb.Append("B").Append(Text).Append(Color.Packed).Append('|');
 }
 

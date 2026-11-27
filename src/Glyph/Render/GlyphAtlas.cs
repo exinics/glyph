@@ -22,6 +22,8 @@ internal sealed class GlyphAtlas : IDisposable
     readonly ID2D1RenderTarget rt;
     readonly ID2D1SolidColorBrush brush;
     readonly IDWriteTextFormat format;
+    readonly IDWriteFactory dw;
+    IDWriteTextFormat? iconFormat;
     readonly ID2D1Factory d2d;
     readonly float textTop;
     readonly ushort[] bmp = new ushort[65536];          // code point -> slot + 1 (0 = not yet drawn)
@@ -32,16 +34,14 @@ internal sealed class GlyphAtlas : IDisposable
     public GlyphAtlas(ID3D11Device device, ID2D1Factory d2d, IDWriteFactory dw, FontOptions s)
     {
         this.d2d = d2d;
+        this.dw = dw;
         var family = s.Font;
-        using (var fonts = dw.GetSystemFontCollection(false))
+        if (!Fonts.Has(dw, family))
         {
-            if (!fonts.FindFamilyName(family, out _))
-            {
-                FontProblem = $"theme: font \"{family}\" isn't installed; using Consolas";
-                family = "Consolas";
-            }
+            FontProblem = $"theme: font \"{family}\" isn't installed (or in config\\fonts); using Consolas";
+            family = "Consolas";
         }
-        format = dw.CreateTextFormat(family, null, Weight(s.FontWeight), Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, s.FontSize, "en-us");
+        format = dw.CreateTextFormat(family, Fonts.Collection(dw), Weight(s.FontWeight), Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, s.FontSize, "en-us");
         format.WordWrapping = WordWrapping.NoWrap;
 
         float advance, lineH;
@@ -119,7 +119,18 @@ internal sealed class GlyphAtlas : IDisposable
             var r = new Rect(x, y, CellW, CellH);
             rt.PushAxisAlignedClip(r, AntialiasMode.Aliased);
             rt.Clear(new Color4(0, 0, 0, 0));
-            if (!Shapes(cp, x, y))
+            if (Symbols.IsIcon(cp))
+            {
+                // an icon ({icon:name}): from the icon font, as big as the cell allows, in the middle
+                rt.AntialiasMode = AntialiasMode.PerPrimitive;
+                float size = Math.Min(CellW, CellH) * Symbols.Scale;
+                iconFormat ??= Symbols.Format(dw, size);
+                string s = char.ConvertFromUtf32(cp);
+                using var layout = dw.CreateTextLayout(s, iconFormat, CellW * 3, CellH * 3);
+                var m = layout.Metrics;
+                rt.DrawTextLayout(new System.Numerics.Vector2(x + (CellW - m.Width) / 2, y + (CellH - m.Height) / 2), layout, brush, DrawTextOptions.None);
+            }
+            else if (!Shapes(cp, x, y))
             {
                 rt.AntialiasMode = AntialiasMode.PerPrimitive;
                 string s = char.ConvertFromUtf32(cp);
@@ -333,6 +344,7 @@ internal sealed class GlyphAtlas : IDisposable
 
     public void Dispose()
     {
+        iconFormat?.Dispose();
         brush.Dispose(); rt.Dispose(); Srv.Dispose(); tex.Dispose(); format.Dispose();
     }
 }

@@ -61,11 +61,15 @@ internal sealed class FrameOptions
     [Category("3. Fill"), DisplayName("Fill opacity"), Range(0, 1)] public float FillOpacity { get; set; } = 0.9f;
     [Category("3. Fill"), DisplayName("Fill to"), Description("A second colour: the fill fades from Fill to this one. none = one colour."), Color, TypeConverter(typeof(ColorNameConverter))] public string Fill2 { get; set; } = "none";
     [Category("3. Fill"), DisplayName("Fade angle"), Description("Direction of the fade, in degrees (90 = top to bottom)."), Range(-360, 360)] public float FillAngle { get; set; } = 90;
-    [Category("3. Fill"), Description("A pattern over the fill."), Choices("none", "scanlines", "grid", "dots", "diagonal", "crosshatch", "vlines"), TypeConverter(typeof(ChoicesConverter))] public string Pattern { get; set; } = "none";
+    [Category("3. Fill"), Description("A pattern over the fill."), Choices("none", "scanlines", "grid", "dots", "crosses", "diagonal", "crosshatch", "vlines"), TypeConverter(typeof(ChoicesConverter))] public string Pattern { get; set; } = "none";
     [Category("3. Fill"), DisplayName("Pattern colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string PatternColor { get; set; } = "line";
     [Category("3. Fill"), DisplayName("Pattern opacity"), Range(0, 1)] public float PatternOpacity { get; set; } = 0.35f;
     [Category("3. Fill"), DisplayName("Pattern spacing"), Description("Pixels between the pattern's lines or dots."), Range(2, 200)] public float PatternSpacing { get; set; } = 4;
+    [Category("3. Fill"), DisplayName("Pattern size"), Description("Thickness of the pattern's lines or dots, in pixels."), Range(0.5, 50)] public float PatternSize { get; set; } = 1;
     [Category("3. Fill"), DisplayName("Hover fill"), Description("Fill colour under the mouse, when it does something on click. none = no change."), Color, TypeConverter(typeof(ColorNameConverter))] public string HoverFill { get; set; } = "none";
+    [Category("3. Fill"), DisplayName("Text colour"), Description("Colour of the text inside (bar modules, buttons). none = the text's own colour. Set it for dark fills on a light theme (or the other way round)."), Color, TypeConverter(typeof(ColorNameConverter))] public string TextColor { get; set; } = "none";
+    [Category("3. Fill"), DisplayName("Hover text"), Description("Colour of the text inside (bar modules, buttons) while the mouse is over it. none = unchanged. Set it when Hover fill is close to the text colour."), Color, TypeConverter(typeof(ColorNameConverter))] public string HoverText { get; set; } = "none";
+    [Category("3. Fill"), DisplayName("Hover wipe"), Description("The hover fill slides in from the left over this many milliseconds instead of appearing at once. 0 = at once. Used by menus and lists that animate."), Range(0, 2000)] public float HoverWipe { get; set; }
 
     [Category("4. Border"), Description("Border colour. none = no border."), Color, TypeConverter(typeof(ColorNameConverter))] public string Border { get; set; } = "line";
     [Category("4. Border"), DisplayName("Border width"), Range(0, 50)] public float BorderWidth { get; set; } = 1;
@@ -102,6 +106,9 @@ internal sealed class FrameOptions
     [Category("6. Corners & marks"), DisplayName("Corner mark"), Description("A small filled triangle in one corner. none = no mark."), Color, TypeConverter(typeof(ColorNameConverter))] public string CornerMark { get; set; } = "none";
     [Category("6. Corners & marks"), DisplayName("Mark corner"), Choices("top_left", "top_right", "bottom_left", "bottom_right"), TypeConverter(typeof(ChoicesConverter))] public string MarkCorner { get; set; } = "bottom_right";
     [Category("6. Corners & marks"), DisplayName("Mark size"), Range(1, 200)] public float MarkSize { get; set; } = 8;
+
+    [Category("6. Corners & marks"), DisplayName("Corner squares"), Description("Small filled squares centred on all four corners. none = no squares."), Color, TypeConverter(typeof(ColorNameConverter))] public string CornerSquares { get; set; } = "none";
+    [Category("6. Corners & marks"), DisplayName("Square size"), Range(1, 100)] public float CornerSquareSize { get; set; } = 6;
 
     [Category("7. Decorations"), Description("A thick stripe along one side. none = no stripe."), Color, TypeConverter(typeof(ColorNameConverter))] public string Stripe { get; set; } = "none";
     [Category("7. Decorations"), DisplayName("Stripe side"), Choices("left", "right", "top", "bottom"), TypeConverter(typeof(ChoicesConverter))] public string StripeSide { get; set; } = "left";
@@ -249,7 +256,7 @@ internal static class FramePainter
     /// Draws the frame in `outer` (which includes a tab or an above-title). `fill` = false skips the inside
     /// (windows: their own contents are there).
     public static void Draw(Canvas c, FrameOptions f, Theme t, RectangleF outer, string title, string titleRight, float baseSize,
-                            bool hot = false, bool fill = true)
+                            bool hot = false, bool fill = true, float wipe = 1)
     {
         var dc = c.Dc;
         var fac = dc.Factory;
@@ -283,6 +290,9 @@ internal static class FramePainter
         // fill + pattern
         if (fill)
         {
+            // a wiping hover: the normal fill, then the hover fill growing from the left
+            bool wiping = hot && f.HoverFill != "none" && wipe < 0.999f;
+            if (wiping) hot = false;
             var fc = hot && f.HoverFill != "none" ? t[f.HoverFill] : t[f.Fill];
             if (f.Fill2 != "none" && !(hot && f.HoverFill != "none"))
             {
@@ -296,33 +306,17 @@ internal static class FramePainter
                 dc.FillGeometry(shape, b);
             }
             else if (fc.A > 0 && f.FillOpacity > 0) dc.FillGeometry(shape, c.Brush(fc, hot && f.HoverFill != "none" ? Math.Max(0.6f, f.FillOpacity) : f.FillOpacity));
+            if (wiping && wipe > 0.001f)
+            {
+                PushClip(c, shape, box);
+                dc.FillRectangle(new Rect(box.X - 1, box.Y - 1, (box.Width + 2) * wipe, box.Height + 2), c.Brush(t[f.HoverFill], Math.Max(0.6f, f.FillOpacity)));
+                dc.PopLayer();
+            }
 
             if (f.Pattern != "none" && f.PatternOpacity > 0)
             {
                 PushClip(c, shape, box);
-                var br = c.Brush(t[f.PatternColor], f.PatternOpacity);
-                float sp = Math.Max(2, f.PatternSpacing);
-                switch (f.Pattern)
-                {
-                    case "scanlines": for (float y = box.Y; y < box.Bottom; y += sp) dc.FillRectangle(new Rect(box.X, y, box.Width, 1), br); break;
-                    case "vlines": for (float x = box.X; x < box.Right; x += sp) dc.FillRectangle(new Rect(x, box.Y, 1, box.Height), br); break;
-                    case "grid":
-                        for (float y = box.Y; y < box.Bottom; y += sp) dc.FillRectangle(new Rect(box.X, y, box.Width, 1), br);
-                        for (float x = box.X; x < box.Right; x += sp) dc.FillRectangle(new Rect(x, box.Y, 1, box.Height), br);
-                        break;
-                    case "dots":
-                        for (float y = box.Y + sp / 2; y < box.Bottom; y += sp)
-                            for (float x = box.X + sp / 2; x < box.Right; x += sp) dc.FillRectangle(new Rect(x, y, 1, 1), br);
-                        break;
-                    case "diagonal":
-                    case "crosshatch":
-                        for (float d = -box.Height; d < box.Width; d += sp)
-                        {
-                            dc.DrawLine(V(box.X + d, box.Bottom), V(box.X + d + box.Height, box.Y), br, 1);
-                            if (f.Pattern == "crosshatch") dc.DrawLine(V(box.X + d, box.Y), V(box.X + d + box.Height, box.Bottom), br, 1);
-                        }
-                        break;
-                }
+                Patterns.Fill(c, box, f.Pattern, t[f.PatternColor], f.PatternOpacity, f.PatternSpacing, f.PatternSize);
                 dc.PopLayer();
             }
         }
@@ -456,6 +450,16 @@ internal static class FramePainter
             if (brc) Br(x1, y1, -1, -1);
         }
 
+        // corner squares
+        if (f.CornerSquares != "none")
+        {
+            float q = f.CornerSquareSize, h2 = q / 2;
+            var qb = c.Brush(t[f.CornerSquares]);
+            float bx0 = box.X + bw / 2, by0 = box.Y + bw / 2, bx1 = box.Right - bw / 2, by1 = box.Bottom - bw / 2;
+            foreach (var (qx, qy) in new[] { (bx0, by0), (bx1, by0), (bx0, by1), (bx1, by1) })
+                dc.FillRectangle(new Rect(qx - h2, qy - h2, q, q), qb);
+        }
+
         // corner mark
         if (f.CornerMark != "none")
         {
@@ -518,6 +522,7 @@ internal static class FramePainter
         void All(float v) { l = Math.Max(l, v); tp = Math.Max(tp, v); r = Math.Max(r, v); b = Math.Max(b, v); }
         if (f.Glow != "none") All(f.GlowSize * 2);
         if (f.Brackets != "none") All(Math.Max(0, f.BracketOffset) + f.BracketWidth);
+        if (f.CornerSquares != "none") All(f.CornerSquareSize / 2);
         if (f.Ticks != "none")
         {
             float tl = f.TickLength * 2;

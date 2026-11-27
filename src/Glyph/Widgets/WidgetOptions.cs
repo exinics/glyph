@@ -15,7 +15,7 @@ internal sealed class WidgetsFile
         ["media"] = () => new MediaOptions(), ["calendar"] = () => new CalendarOptions(), ["weather"] = () => new WeatherOptions(),
         ["text"] = () => new TextOptions(), ["command"] = () => new CommandOptions(), ["sysinfo"] = () => new SysInfoOptions(),
         ["image"] = () => new ImageOptions(), ["video"] = () => new VideoOptions(), ["audio"] = () => new AudioOptions(),
-        ["feed"] = () => new FeedOptions(),
+        ["feed"] = () => new FeedOptions(), ["menu"] = () => new MenuOptions(), ["divider"] = () => new DividerOptions(),
     };
 
     /// Short descriptions for the settings window's "Add widget" menu and the guide.
@@ -26,6 +26,8 @@ internal sealed class WidgetsFile
         ["text"] = "any text, with live values like {cpu} and colours", ["command"] = "the output of a command or script",
         ["sysinfo"] = "ASCII logo with system info (neofetch style)", ["image"] = "a picture", ["video"] = "plays a video or an ASCII clip (as characters or the real picture)", ["audio"] = "sound controls: output device, master and per-app volume",
         ["feed"] = "lines that keep coming in: made-up hex, logs or values (a live-looking readout)",
+        ["menu"] = "a menu screen: your shortcut groups as tabs, the chosen group's shortcuts as a list, details of the chosen one",
+        ["divider"] = "a line across or down the screen: solid, dashed, dotted, double or a printed-form band",
     };
 
     public static string FilePath(string theme) => Path.Combine(Paths.ThemeDir(theme), "widgets.toml");
@@ -71,6 +73,8 @@ internal abstract class WidgetOptions
     public string Anchor { get; set; } = "top_left";
     [Category("Placement"), DisplayName("Offset X"), Description("Move it right (or left if negative), in pixels.")] public int OffsetX { get; set; } = 16;
     [Category("Placement"), DisplayName("Offset Y"), Description("Move it down (or up if negative), in pixels.")] public int OffsetY { get; set; } = 16;
+    [Category("Placement"), Description("Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size."), Choices("none", "width", "height", "both"), TypeConverter(typeof(ChoicesConverter))]
+    public string Stretch { get; set; } = "none";
     [Category("Box"), Description("A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style."), TypeConverter(typeof(FrameNameConverter))] public string Frame { get; set; } = "auto";
     [Category("Box"), DisplayName("Box colour"), Description("Colour of this panel. auto = the theme's panel colour."), Color, TypeConverter(typeof(ColorNameConverter))] public string Background { get; set; } = "auto";
     [Category("Box"), DisplayName("Box opacity"), Description("0 = see-through, 1 = solid, -1 = the theme's."), Range(-1, 1)] public float Opacity { get; set; } = -1;
@@ -78,6 +82,8 @@ internal abstract class WidgetOptions
     [Category("Box"), DisplayName("Border colour"), Description("auto = the theme's."), Color, TypeConverter(typeof(ColorNameConverter))] public string BorderColor { get; set; } = "auto";
     [Category("Box"), DisplayName("Border width"), Description("Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines."), Range(-1, 50)] public float BorderWidth { get; set; } = -1;
     [Category("Box"), DisplayName("Box shadow"), Description("Smooth style. -1 = the theme's."), Range(-1, 1)] public float PanelShadow { get; set; } = -1;
+    [Category("Box"), Description("Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\\fonts are listed too."), TypeConverter(typeof(FontNameConverter))] public string Font { get; set; } = "";
+    [Category("Box"), DisplayName("Font size"), Description("Text size for this box, in pixels. 0 = the theme's."), Range(0, 96)] public float FontSize { get; set; }
     [Category("Box"), DisplayName("Hover colour"), Description("If the box does something on click, it lights up in this colour under the mouse. none = no highlight."), Color, TypeConverter(typeof(ColorNameConverter))] public string BoxHoverColor { get; set; } = "none";
     [Category("Link"), DisplayName("Link to"), Description("Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style.")] public string LinkTo { get; set; } = "";
     [Category("Link"), DisplayName("Link colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string LinkColor { get; set; } = "accent_dim";
@@ -86,6 +92,9 @@ internal abstract class WidgetOptions
     [Category("Link"), DisplayName("Link gap"), Description("Pixels between the lines."), Range(1, 50)] public float LinkGap { get; set; } = 5;
     [Category("Link"), DisplayName("Link shape"), Description("elbow = a 45° bend then straight, straight = one straight line."), Choices("elbow", "straight"), TypeConverter(typeof(ChoicesConverter))] public string LinkShape { get; set; } = "elbow";
     [Category("Link"), DisplayName("Link ends"), Description("A small square where the line meets the panels."), Choices("none", "dot", "both"), TypeConverter(typeof(ChoicesConverter))] public string LinkEnds { get; set; } = "dot";
+
+    public bool StretchW => Stretch is "width" or "both";
+    public bool StretchH => Stretch is "height" or "both";
 
     // the box look with "auto" values filled in from the theme
     public Rgba BoxColor(Theme t) => t[Background == "auto" ? t.Options.Ui.PanelColor : Background];
@@ -157,6 +166,10 @@ internal sealed class ClockOptions : PanelOptions
     [Category("Clock"), DisplayName("Shadow colour"), Description("A shadow behind the big digits. none = no shadow."), Color, TypeConverter(typeof(ColorNameConverter))] public string Shadow { get; set; } = "none";
     [Category("Clock"), DisplayName("Big size"), Description("Smooth style: size of the big line compared with normal text."), Range(1, 20)] public float BigScale { get; set; } = 5;
     [Category("Clock"), DisplayName("Big font"), Description("Smooth style: font of the big line. Empty = the theme's font."), TypeConverter(typeof(FontNameConverter))] public string BigFont { get; set; } = "Segoe UI Light";
+    [Category("Clock"), DisplayName("Letter spacing"), Description("Smooth style: extra pixels between the big line's letters."), Range(-5, 80)] public float Spacing { get; set; }
+    [Category("Clock"), DisplayName("Subtitle spacing"), Description("Smooth style: extra pixels between the subtitle's letters."), Range(-5, 50)] public float SubtitleSpacing { get; set; }
+    [Category("Clock"), DisplayName("Subtitle colour"), Description("auto = the text colour."), Color, TypeConverter(typeof(ColorNameConverter))] public string SubtitleColor { get; set; } = "auto";
+    [Category("Clock"), DisplayName("Subtitle size"), Choices("small", "normal", "large"), TypeConverter(typeof(ChoicesConverter))] public string SubtitleSize { get; set; } = "large";
 }
 
 internal sealed class SystemOptions : PanelOptions
@@ -192,6 +205,10 @@ internal sealed class MediaOptions : PanelOptions
     [Category("Media"), DisplayName("Visualiser peak colour"), Description("Colour of the tallest bars."), Color, TypeConverter(typeof(ColorNameConverter))] public string VisualiserPeak { get; set; } = "accent";
     [Category("Media"), DisplayName("Visualiser rate"), Description("Frames per second while it moves (higher = smoother, more CPU)."), Range(5, 60)] public int VisualiserFps { get; set; } = 24;
     [Category("Media"), Description("Show previous / play-pause / next buttons.")] public bool Controls { get; set; } = true;
+    [Category("Media"), DisplayName("Previous button"), Description("What the button shows: text or an icon, e.g. {icon:skip_previous} (Icons page). Empty = the built-in symbol.")] public string PrevLabel { get; set; } = "";
+    [Category("Media"), DisplayName("Play button"), Description("e.g. {icon:play_arrow}. Empty = the built-in symbol.")] public string PlayLabel { get; set; } = "";
+    [Category("Media"), DisplayName("Pause button"), Description("e.g. {icon:pause}. Empty = the built-in symbol.")] public string PauseLabel { get; set; } = "";
+    [Category("Media"), DisplayName("Next button"), Description("e.g. {icon:skip_next}. Empty = the built-in symbol.")] public string NextLabel { get; set; } = "";
     [Category("Media"), DisplayName("Hide when nothing plays"), Description("Hide the whole panel when no media app is open.")] public bool HideWhenIdle { get; set; } = true;
 }
 
@@ -226,6 +243,9 @@ internal sealed class TextOptions : PanelOptions
     [Category("Text"), Choices("small", "normal", "large", "title"), TypeConverter(typeof(ChoicesConverter))] public string Size { get; set; } = "normal";
     [Category("Text"), Choices("left", "center", "right"), TypeConverter(typeof(ChoicesConverter))] public string Align { get; set; } = "left";
     [Category("Text"), Description("Use the theme's monospace font (lines up columns and ASCII art).")] public bool Mono { get; set; }
+    [Category("Text"), DisplayName("Letter spacing"), Description("Smooth style: extra pixels between letters (wide, typed-looking headings)."), Range(-5, 50)] public float Spacing { get; set; }
+    [Category("Text"), DisplayName("Text shadow"), Description("Smooth style: the text printed again a little lower and to the right, in this colour, under it. none = no shadow."), Color, TypeConverter(typeof(ColorNameConverter))] public string TextShadow { get; set; } = "none";
+    [Category("Text"), DisplayName("Shadow offset"), Description("How far the text shadow sits from the text, in pixels."), Range(0, 40)] public float ShadowOffset { get; set; } = 2;
 }
 
 internal sealed class CommandOptions : PanelOptions

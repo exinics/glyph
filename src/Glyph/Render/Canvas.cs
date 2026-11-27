@@ -17,6 +17,8 @@ internal sealed class Canvas : IDisposable
     readonly Dictionary<string, IDWriteTextFormat> formats = new();
     readonly Dictionary<string, (ID2D1Bitmap1 bmp, int w, int h)> bitmaps = new();
     readonly Dictionary<string, IDWriteInlineObject> ellipses = new();
+    int fontsVersion = -1;
+    readonly Dictionary<string, IDWriteTextLayout> layouts = new();   // text with icons, laid out once
 
     public Canvas(ID2D1DeviceContext dc, IDWriteFactory dw)
     {
@@ -71,9 +73,20 @@ internal sealed class Canvas : IDisposable
 
     public IDWriteTextFormat Format(string font, float size, bool bold, string align, bool wrap)
     {
+        if (fontsVersion != Fonts.Version)   // font files changed: make the formats again from the new set
+        {
+            fontsVersion = Fonts.Version;
+            foreach (var x in formats.Values) x.Dispose();
+            formats.Clear();
+            foreach (var e in ellipses.Values) e.Dispose();
+            ellipses.Clear();
+            widths.Clear();
+            foreach (var l in layouts.Values) l.Dispose();
+            layouts.Clear();
+        }
         var key = $"{font}|{size}|{bold}|{align}|{wrap}";
         if (formats.TryGetValue(key, out var f)) return f;
-        f = dw.CreateTextFormat(font, null, bold ? FontWeight.SemiBold : FontWeight.Normal, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, size, "en-us");
+        f = dw.CreateTextFormat(font, Fonts.Collection(dw), bold ? FontWeight.SemiBold : FontWeight.Normal, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, size, "en-us");
         f.TextAlignment = align switch { "center" => TextAlignment.Center, "right" => TextAlignment.Trailing, _ => TextAlignment.Leading };
         f.ParagraphAlignment = ParagraphAlignment.Near;
         f.WordWrapping = wrap ? WordWrapping.Wrap : WordWrapping.NoWrap;
@@ -86,10 +99,24 @@ internal sealed class Canvas : IDisposable
 
     public void Text(string s, RectangleF r, Rgba c, string font, float size, bool bold = false, string align = "left", bool wrap = false, float opacity = 1)
     {
+        s = Symbols.Expand(s);
         if (s.Length == 0) return;
         var f = Format(font, size, bold, align, wrap);
         Dc.PushAxisAlignedClip(new Rect(r.X, r.Y, r.Width, r.Height), AntialiasMode.Aliased);
-        Dc.DrawText(s, f, new Rect(r.X, r.Y, r.Width, r.Height), Brush(c, opacity), DrawTextOptions.None, Vortice.DCommon.MeasuringMode.Natural);
+        if (Symbols.HasIcon(s))
+        {
+            // icons ({icon:name}) come from the icon font, whatever font the text is in
+            var lk = $"{font}|{size}|{bold}|{align}|{wrap}|{r.Width:0.#}|{r.Height:0.#}|{Symbols.LookKey}|{s}";
+            if (!layouts.TryGetValue(lk, out var layout))
+            {
+                if (layouts.Count > 300) { foreach (var x in layouts.Values) x.Dispose(); layouts.Clear(); }
+                layout = dw.CreateTextLayout(s, f, Math.Max(1, r.Width), Math.Max(1, r.Height));
+                Symbols.Mark(layout, s, size, Fonts.Collection(dw));
+                layouts[lk] = layout;
+            }
+            Dc.DrawTextLayout(new Vector2(r.X, r.Y), layout, Brush(c, opacity), DrawTextOptions.None);
+        }
+        else Dc.DrawText(s, f, new Rect(r.X, r.Y, r.Width, r.Height), Brush(c, opacity), DrawTextOptions.None, Vortice.DCommon.MeasuringMode.Natural);
         Dc.PopAxisAlignedClip();
     }
 
@@ -98,12 +125,15 @@ internal sealed class Canvas : IDisposable
     /// Width of a line of text in pixels (cached).
     public float Measure(string s, string font, float size, bool bold)
     {
+        s = Symbols.Expand(s);
         if (s.Length == 0) return 0;
-        var key = $"{font}|{size}|{bold}|{s}";
+        bool icons = Symbols.HasIcon(s);
+        var key = icons ? $"{font}|{size}|{bold}|{Symbols.LookKey}|{s}" : $"{font}|{size}|{bold}|{s}";
         if (widths.TryGetValue(key, out var w)) return w;
         if (widths.Count > 5000) widths.Clear();
         var f = Format(font, size, bold, "left", false);
         using var layout = dw.CreateTextLayout(s, f, 100000, 1000);
+        if (icons) Symbols.Mark(layout, s, size, Fonts.Collection(dw));
         w = layout.Metrics.WidthIncludingTrailingWhitespace;
         widths[key] = w;
         return w;
@@ -216,6 +246,8 @@ internal sealed class Canvas : IDisposable
         foreach (var e in ellipses.Values) e.Dispose();
         ellipses.Clear();
         widths.Clear();
+        foreach (var l in layouts.Values) l.Dispose();
+        layouts.Clear();
     }
 
     public void Dispose()

@@ -24,12 +24,13 @@ change appears within about a second.
 
 ## 1b. Installing on another PC, and updates
 
-1. Install the .NET 9 desktop runtime once: `winget install Microsoft.DotNet.DesktopRuntime.9`
-   (and ffmpeg for videos and the converter: `winget install Gyan.FFmpeg.Essentials`).
-2. Download `Glyph-win-x64.zip` from the newest release on GitHub (github.com/exinics/glyph/releases),
-   unzip it anywhere you like (e.g. `C:\Glyph`) and run `Glyph\bin\Glyph.exe`. The first start sets up the **operator**
-   theme and imports your desktop shortcuts into `Glyph\config`.
-3. Settings > General > *Start with Windows* to have it start by itself.
+1. Download `Glyph-Setup-x.y.z.exe` from the newest release on GitHub (github.com/exinics/glyph/releases) and run
+   it: pick the folder, Start menu shortcuts, "start when I sign in". It gets the .NET 9 desktop runtime if needed,
+   and offers to bring the settings of a Glyph you used before. (Or the zip: unzip anywhere, run `Glyph\bin\Glyph.exe`;
+   needs `winget install Microsoft.DotNet.DesktopRuntime.9`.)
+2. For videos and the converter: `winget install Gyan.FFmpeg.Essentials`.
+3. The first start sets up the **operator** theme and imports your desktop shortcuts into `config`.
+   Settings > General > *Start with Windows* turns starting by itself on or off.
 
 **Updates** (General > Updates): `auto` looks on GitHub 30 seconds after Glyph starts and every 6 hours, downloads a
 newer version and restarts into it (a few seconds); `ask` shows a note and an *Update* item in the tray menu; `off`
@@ -58,7 +59,7 @@ in or out is picked up within a second. Theme sync, window frames and the launch
 
 | Page | What's there |
 |---|---|
-| **Design** | A live preview of the theme you're editing. Click a widget, the bar, a bar module or the background to change it on the right; drag widgets to move them, drag the corner square to resize, and *Draw box ▾* to drag out a new box and choose what's in it. *Animate* lets the wallpaper and mouse effects play. The colour squares at the bottom change the theme's colours. *Pick colour* is an eyedropper: click anywhere on the preview to put that colour in the palette (as the accent with matching shades, or any colour). *Wallpaper colours…* finds the wallpaper's main colours and offers an accent or a whole palette made from them. |
+| **Design** | A live preview of the theme you're editing. Click a **part** of a widget (a tab, a list item, a panel's title strip, its contents, a button…), the bar, a bar module or the background to change it on the right: **Properties** shows just that part's options (*Whole widget* shows them all), **Look** the frame the part is drawn with (edit it there; it tells you what else uses that frame, and *Give this part its own copy* splits it off), **Animations** the widget's tweens (6i). Then drag widgets to move them, drag the corner square to resize, and *Draw box ▾* to drag out a new box and choose what's in it. *Animate* lets the wallpaper and mouse effects play. The colour squares at the bottom change the theme's colours. *Pick colour* is an eyedropper: click anywhere on the preview to put that colour in the palette (as the accent with matching shades, or any colour). *Wallpaper colours…* finds the wallpaper's main colours and offers an accent or a whole palette made from them. |
 | **Frames** | The theme's box designs (see 6b5), with a live preview. *New frame ▾* starts from a ready-made design. |
 | **Themes** | Your themes. *Use this theme* shows it on the desktop. *New theme…* and *Duplicate…* make a copy to change, so you never break a theme you like. Rename, delete, open the folder, or *Restore the built-in theme* to get operator back as it came. Clicking a theme picks it for editing in the other tabs (the line at the top says which one you're editing). |
 | **Colours & look** | The **palette** (every colour in the theme; double-click to change one, or type a hex code) and the theme's options: its **style**, the **character font**, the **smooth style** (panel colour and see-through-ness, corner roundness, border, shadow, font) and the **screen effects** (glow, scanlines…). |
@@ -69,7 +70,9 @@ in or out is picked up within a second. Theme sync, window frames and the launch
 | **Widgets** | Everything on the desktop: shortcut panels, clock, system monitor, music, calendar, weather, text, command output, system info, pictures, videos, sound controls. *Add widget ▾*, then change the selected one. |
 | **General** | Start with Windows, closing Wallpaper Engine, when to rest to save power; start / quit / restart Glyph, the converter, folders. |
 
-At the bottom of each list of options there's a short explanation of whichever option you click.
+At the bottom of each list of options there's a short explanation of whichever option you click. Options are grouped
+with where a thing sits first and its box and links last; switches read On / Off, and every colour option shows its
+colour beside the name.
 
 ## 3. Themes and styles
 
@@ -147,6 +150,10 @@ them as `settings.before-glyph.json`.
   Windows once and kept in `icons\cache`.
 - *Set picture…* copies your image into `icons\` and uses it; it's recoloured to match the theme
   unless the panel's icon style is *original*.
+- **Groups**: give shortcuts a *Group* (e.g. Games, Study) and a shortcuts panel can show one group, a bar *icons*
+  module can show one, and a **menu** widget shows every group as a tab (6c). *Groups (menu tabs)…* on the Shortcuts
+  page sets each group's tab order, icon (`{icon:name}`), subtitle and a sentence about it (`[[group]]` tables in
+  `shortcuts.toml`). A shortcut's *Description* is shown by menus.
 
 ## 6. The wallpaper
 
@@ -155,6 +162,10 @@ top; empty parts let the ones below show). The **mouse effect** lights up charac
 
 If nothing in the wallpaper moves (no animated layers, mouse effect off), Glyph stops drawing frames and
 only redraws when something changes, like the mouse moving over a shortcut.
+
+Smooth themes can lay up to two **patterns** over the whole backdrop (Wallpaper > Backdrop > *Pattern* and
+*Pattern 2*): dots, crosses, scanlines, a grid, vertical or diagonal lines, crosshatch, each with its own colour,
+see-through-ness, spacing and thickness. A dot grid with faint scanlines over it gives a printed-paper look.
 
 ## 6b. The bar
 
@@ -169,6 +180,25 @@ The bar pauses only for fullscreen apps and the lock screen. Set *Position* to b
 taskbar, and General > *Windows taskbar* to `hide` to remove Windows' own taskbar completely (it comes back when
 Glyph quits). With the taskbar hidden, its tray icons (including Glyph's) aren't visible: open Glyph's settings
 with a bar button (`settings`), `Glyph.lnk`, or the Start menu.
+
+**Glyph's bar as the taskbar.** Set General > *Windows taskbar* to `hide` and put the bar at the bottom: it then
+does the taskbar's jobs, each a module you can style like any other:
+- **Start**: the *Start menu button* preset (`keys:win`; right-click `keys:win+x`), plus *Notifications and calendar*
+  (`keys:win+n`), *Quick settings* (`keys:win+a`) and *Show desktop* (`keys:win+d`) presets.
+- **Pinned apps**: an *icons* module with your shortcuts' names (or a shortcuts group).
+- **Open windows**: the **tasks** module (below).
+- **Tray icons**: the **tray** module shows the notification-area icons (Discord, a VPN, Glyph's own…), which are
+  otherwise out of sight while Windows' taskbar is hidden. Left-click, double-click and right-click reach the program
+  just as on Windows' taskbar. *Leave out* hides icons by program name or tooltip. While a bar shows a tray module,
+  Glyph keeps a hidden tray window above Explorer's so programs send their icons to Glyph too; everything is passed
+  on to Explorer, so its own tray stays complete and nothing changes when Glyph quits.
+
+The **tasks** module lists the open windows like the taskbar does (icon and program name or window title); click
+one to bring it to the front, click the one in front to minimise it. *Group by program* gives one button per
+program (`{count}` = its windows; clicking again goes to its next window), *Right-click* can close, minimise or
+maximise, and *Leave out* skips programs by name. Any module can have a **Caption**: a small
+label above (or under) it, e.g. `APPS`, or `{window_app}` under the window title. Give a module a frame with only a
+left border (*Border sides* = left) to split the bar into sections with thin lines.
 
 ## 6b2. Boxes and the background
 
@@ -213,12 +243,15 @@ preview: type a sample title and pick *Show as* panel, window, bar module or but
 - **Shape**: any corner cut off at 45° (*Cut top-left* … *Cut bottom-left*), rounded corners, or the whole box
   leaning sideways (*Slant*).
 - **Fill**: a colour and see-through-ness, a fade to a second colour, a **pattern** over it (scanlines, grid, dots,
-  diagonal lines, crosshatch, vertical lines) and a different fill under the mouse (*Hover fill*).
+  diagonal lines, crosshatch, vertical lines, crosses; *Pattern size* = how thick) and a different fill under the
+  mouse (*Hover fill*). *Hover wipe* makes that fill slide in from the left (menus animate it). *Text colour* and
+  *Hover text* set the colour of the text inside (bar modules, buttons), e.g. light text on a dark plate.
 - **Border**: colour, width, dashes, only some sides, and a second **inner border**.
 - **Title**: *plain* (top-left inside), *bar* (a strip across the top), *tab* (a tab sticking up from the top edge,
   with a slanted side), *line* (the title with a line running to the right) or *above* (over the box). Its font,
   size, capitals and letter spacing, and a second text on the right (*Title right* on a widget, e.g. `LIVE`).
-- **Marks**: corner brackets ⌜ ⌟ on some or all corners, a filled triangle in one corner, a thick **stripe** on one
+- **Marks**: corner brackets ⌜ ⌟ on some or all corners, small filled **corner squares** on all four corners, a
+  filled triangle in one corner, a thick **stripe** on one
   side, a block of **hatch** lines ////// at a corner, **ruler ticks** along a side, a soft **glow** and a shadow.
 
 Things pick a frame by name: a widget's *Frame* (or every panel through Colours & look > Smooth style > *Panel
@@ -244,6 +277,26 @@ calendar, weather, text, command output, system info and pictures. Each sits aga
 they're drawn with characters (big block digits, braille graphs, ASCII album art), in smooth themes as
 panels with normal text, smooth bars and pictures.
 
+*Stretch* (Placement) makes a box reach the screen's edges: `width` runs from *Offset X* on the left to *Offset X*
+on the right, `height` from *Offset Y* at the top to *Offset Y* at the bottom, `both` does both. An empty text widget
+stretched to `both` with a frame is a border around the whole screen. Text widgets also have *Letter spacing* and a
+*Text shadow* (the text printed again a little lower right); the clock has letter spacing for both lines.
+
+- **menu**: a whole menu screen made from your shortcut groups (5). The groups are tabs across the top (with the
+  group's icon in a little box, spread across the width or packed), a ruled line under them (`band` = line, dashes
+  and dot triangles), the chosen group's name in big letters with its subtitle and sentence, its shortcuts as a list
+  of plates, and a details panel about the chosen one (what it is, where it points, *Open* and *Show in folder*).
+  A click on a tab or a shortcut chooses it; a double click opens a shortcut (or one click with *Open with* =
+  click). The dark fill slides in under the mouse over *Hover wipe* milliseconds. Scroll over the list when it's
+  long, or over the tabs to change tab. Tabs and plates use plain colours (Tab colour, Active colour…) or frames
+  (*Tab frame*, *Item frame*, *Details frame*).
+- **divider**: a line across or down the screen: solid, dashed, dotted, double, or `band`. With *Stretch* it runs
+  from edge to edge.
+
+Together these make, for example, a printed field-manual look: a ruled screen border with corner squares, a dotted
+ground with scanlines, a search box that opens the launcher, a centred clock, a menu of the shortcut groups, a
+status panel, and a ruled bar at the bottom with the window in front, the open windows and a tray section.
+
 ## 6d. Values, colours and actions in text
 
 Anywhere you can type text for the bar or a widget, you can use:
@@ -259,6 +312,7 @@ Anywhere you can type text for the bar or a widget, you can use:
 | `{volume}` `{muted}` `{volume_icon}` | speaker volume |
 | `{media_title}` `{media_artist}` `{media_album}` `{media_app}` `{media_state}` `{media_icon}` `{media_position}` `{media_length}` | what's playing |
 | `{window}` `{window:40}` | the active window's title (`:40` = at most 40 characters) |
+| `{window_app}` | the program whose window is in front (e.g. Firefox) |
 | `{desktop}` `{desktops}` `{desktop_name}` | virtual desktop number, count, name |
 | `{tiling}` | the tiling layout (dwindle, master, columns, rows, monocle) or off |
 | `{wifi}` `{wifi_signal}` `{network}` | the Wi-Fi network's name, its signal 0–100, and wifi / ethernet / mobile / none |
@@ -288,6 +342,20 @@ Anywhere you can type text for the bar or a widget, you can use:
 | `run:program arguments` | starts a program with arguments |
 | `settings` | opens Glyph's settings |
 | a path, website or `ms-settings:` page | opens it, like double-clicking |
+
+### Icons and fonts in text
+
+- **Icons:** `{icon:name}` anywhere text is shown (bar modules, widget text and titles, frame titles, the media
+  buttons' labels) draws an icon from Google's Material Symbols, e.g. `{icon:home}` `{icon:wifi}` `{icon:play_arrow}`
+  `[accent]{icon:favorite}[/]`. Settings > **Icons** shows all of them with a search: click one to copy its code.
+  Names are the ones on fonts.google.com/icons. Icons take the colour and size of the text around them.
+  Each theme's Colours & look sets *Icon style* (outlined, rounded, sharp: rounded and sharp are downloaded once into
+  `config\fonts` the first time they're used), *Filled icons* and *Icon size*. In terminal themes an icon fills one
+  character cell.
+- **Fonts:** every font setting has a list to pick from: Windows' fonts plus any font files in `config\fonts`.
+  Settings > **Fonts** > *Add font files…* takes `.ttf`/`.otf` files or a whole download from fonts.google.com (the
+  `.zip`). They're only used by Glyph (nothing is installed into Windows). Each widget can have its own font and size
+  (Box > Font, Font size; smooth style).
 
 ## 6e. The launcher (Alt+Space)
 
@@ -343,6 +411,27 @@ records the keys you press; *Does* is any action: `launcher`, the `tile:` ones, 
 uses shows *taken by another program*: pick other keys. Other programs can run actions too:
 `Glyph.exe --action tile:layout:master`.
 
+## 6i. Animations (tweens)
+
+Widgets can move, grow, turn and fade with **tweens**, the same idea as Roblox's TweenService: a tween goes from
+how the widget normally looks to a **goal** (*Move X / Y* in pixels, *Scale*, *Rotate* in degrees, *Opacity*) over
+a *Time*, with an **easing style** (`linear`, `sine`, `quad`, `cubic`, `quart`, `quint`, `exponential`, `circular`,
+`back`, `elastic`, `bounce`) and **direction** (`in`, `out`, `inout`), after a *Delay*. The **trigger** says when:
+
+- `appear`: when Glyph starts (or the tweens change), coming in from the goal: Move Y 40 + Opacity 0 = rises and
+  fades in. Saving other settings doesn't replay it.
+- `hover`: to the goal while the mouse is over the widget, back when it leaves (e.g. Move Y -4 = lifts).
+- `click`: to the goal and back once (Scale 0.95 = a press).
+- `loop`: over and over: *Repeat* more times (-1 = for ever), *Reverses* = there and back each time.
+
+Easiest on the Design page: pick a widget > **Animations** > *Add ▾* (fade in, rise in, slide in, pop in, lift or
+grow on hover, bounce on click, bob, breathe, spin), change it on the right, *▶ Play* to see it. They're kept per theme
+in `animations.toml` (`[[tween]]` tables). *Target* is a widget's *Name* (adding a tween names the widget if it has
+none), `type:clock` for every widget of a type, or `*` for every widget; with several, *Stagger* starts each one a
+little after the one before. Several tweens on one widget add up. Animations are drawn in smooth themes; clicks and
+hover still use the widget's normal place. `loop` tweens keep the desktop drawing frames (a little power), the rest
+only while they play. The menu's hover wipe has its own *Wipe easing* and *Wipe direction*.
+
 ## 6h. Window frames
 
 A theme can draw a frame around your windows (Colours & look > *Window frames*): *Mode* `focused` frames the window
@@ -396,6 +485,10 @@ be replaced.
   maximised windows, lock screen, battery saver) and stops drawing entirely when nothing moves.
 - Measured here: operator about 2% of one CPU core (its feeds and meters keep changing), about 77 MB of its own
   memory. A theme where nothing moves uses under 1%.
+- **Presets** (General > More > Performance): *plugged in*, *on battery* and *battery saver* each pick highest,
+  balanced, low or pause. Highest = the screen's full refresh rate, effects on, smoke worked out every frame, videos at
+  full speed; balanced = each theme as it's made; low = 15 fps, no screen effects, less detail. Every preset can be
+  changed (`[performance.highest]` etc.).
 - To save more: lower the wallpaper's frames per second, lower *update fps* on noise layers, or use fewer layers.
 
 ## 10. If something's wrong
@@ -425,13 +518,49 @@ lower-case name in the first column; a section like `[ui]` is the part of the fi
 
 ### glyph.toml [performance]
 
+Pick a preset for each power state; each preset below can be changed.
+
 | Option | Default | Allowed | What it does |
 |---|---|---|---|
+| `plugged_in` | `"highest"` | highest, balanced, low, pause | **Plugged in.** Preset while the PC runs on mains power (a desktop PC always uses this). pause = don't draw at all. |
+| `on_battery` | `"balanced"` | highest, balanced, low, pause | **On battery.** Preset while unplugged. |
+| `battery_saver` | `"pause"` | highest, balanced, low, pause | **Battery saver.** Preset while Windows battery saver (energy saver) is on. |
 | `pause_when_fullscreen` | `true` | true, false | **Pause when fullscreen.** Stop drawing while a game or video is fullscreen. |
 | `pause_when_maximized` | `true` | true, false | **Pause when maximised.** Stop drawing while maximised windows cover the desktop. |
-| `pause_on_battery_saver` | `true` | true, false | **Pause on battery saver.** Stop drawing while Windows battery saver is on. |
 | `pause_when_locked` | `true` | true, false | **Pause when locked.** Stop drawing on the lock screen. |
-| `battery_fps` | `15` | 0 to 240 | **Frame rate on battery.** Frame rate limit when unplugged. 0 = no limit. |
+
+### glyph.toml [performance.highest]
+
+Everything at the screen's full frame rate and full quality.
+
+| Option | Default | Allowed | What it does |
+|---|---|---|---|
+| `fps` | `"max"` |  | **Frame rate.** max = as fast as the screen shows frames (its refresh rate, e.g. 60 or 144), whatever the theme says. theme = each theme's own frame rate. A number = the theme's frame rate, but no more than this. |
+| `effects` | `true` | true, false | **Screen effects.** Draw the theme's screen effects (bloom, scanlines, curvature...). Off saves the most work for the graphics chip. |
+| `animation_detail` | `"max"` | max, theme, low | **Animation detail.** max = smoke/noise worked out fresh every frame and videos at their own full frame rate. theme = as each theme sets them. low = smoke worked out half as often, videos at most 15 frames a second. |
+| `smooth_dragging` | `true` | true, false | **Smooth dragging.** The selection box and the launcher run at the screen's refresh rate even when the frame rate above is lower (drawing them costs next to nothing). Off = they keep to the frame rate above. |
+
+### glyph.toml [performance.balanced]
+
+Each theme as it's made.
+
+| Option | Default | Allowed | What it does |
+|---|---|---|---|
+| `fps` | `"theme"` |  | **Frame rate.** max = as fast as the screen shows frames (its refresh rate, e.g. 60 or 144), whatever the theme says. theme = each theme's own frame rate. A number = the theme's frame rate, but no more than this. |
+| `effects` | `true` | true, false | **Screen effects.** Draw the theme's screen effects (bloom, scanlines, curvature...). Off saves the most work for the graphics chip. |
+| `animation_detail` | `"theme"` | max, theme, low | **Animation detail.** max = smoke/noise worked out fresh every frame and videos at their own full frame rate. theme = as each theme sets them. low = smoke worked out half as often, videos at most 15 frames a second. |
+| `smooth_dragging` | `true` | true, false | **Smooth dragging.** The selection box and the launcher run at the screen's refresh rate even when the frame rate above is lower (drawing them costs next to nothing). Off = they keep to the frame rate above. |
+
+### glyph.toml [performance.low]
+
+Slow and simple, for the longest battery.
+
+| Option | Default | Allowed | What it does |
+|---|---|---|---|
+| `fps` | `"15"` |  | **Frame rate.** max = as fast as the screen shows frames (its refresh rate, e.g. 60 or 144), whatever the theme says. theme = each theme's own frame rate. A number = the theme's frame rate, but no more than this. |
+| `effects` | `false` | true, false | **Screen effects.** Draw the theme's screen effects (bloom, scanlines, curvature...). Off saves the most work for the graphics chip. |
+| `animation_detail` | `"low"` | max, theme, low | **Animation detail.** max = smoke/noise worked out fresh every frame and videos at their own full frame rate. theme = as each theme sets them. low = smoke worked out half as often, videos at most 15 frames a second. |
+| `smooth_dragging` | `false` | true, false | **Smooth dragging.** The selection box and the launcher run at the screen's refresh rate even when the frame rate above is lower (drawing them costs next to nothing). Off = they keep to the frame rate above. |
 
 ### glyph.toml [launcher] (what the launcher finds)
 
@@ -487,7 +616,7 @@ See 6g.
 
 | Option | Default | Allowed | What it does |
 |---|---|---|---|
-| `font` | `"Cascadia Mono"` |  | Any installed monospace font, e.g. Cascadia Mono, JetBrains Mono, Consolas. |
+| `font` | `"Cascadia Mono"` |  | Any installed monospace font, e.g. Cascadia Mono, JetBrains Mono, Consolas (or one in config\fonts: the Fonts page). |
 | `font_size` | `14` | 6 to 96 | **Font size.** In pixels. Smaller = more, finer characters. |
 | `font_weight` | `"normal"` | thin, light, normal, medium, semibold, bold, black | **Font weight.**  |
 | `line_spacing` | `1` | 0.5 to 3 | **Line spacing.** 1.0 = normal. |
@@ -498,9 +627,12 @@ See 6g.
 
 | Option | Default | Allowed | What it does |
 |---|---|---|---|
-| `font` | `"Segoe UI"` |  | Font for text in the smooth style (any installed font). |
+| `font` | `"Segoe UI"` |  | Font for text in the smooth style: any installed font, or one in config\fonts (the Fonts page). |
 | `font_size` | `13` | 6 to 96 | **Font size.** In pixels. |
 | `bold_titles` | `true` | true, false | **Bold titles.** Panel titles in bold. |
+| `icon_style` | `"outlined"` | outlined, rounded, sharp | **Icon style.** Look of icons written as {icon:name} anywhere (Google's Material Symbols; browse them on the Icons page). Rounded and sharp are downloaded once, the first time they're used. |
+| `icon_fill` | `false` | true, false | **Filled icons.** Solid icons instead of outlines. |
+| `icon_size` | `1.15` | 0.5 to 3 | **Icon size.** Size of icons next to the text they're in: 1 = the text's size. |
 | `corner_radius` | `12` | 0 to 64 | **Corner radius.** Roundness of panel corners, in pixels. |
 | `panel_color` | `"surface"` | colour name or hex | **Panel colour.**  |
 | `panel_opacity` | `0.85` | 0 to 1 | **Panel opacity.** 0 = invisible, 1 = solid. |
@@ -581,6 +713,7 @@ See 6e.
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** The prompt, the cursor and the letters that matched. |
 | `selected_color` | `"accent_dim"` | colour name or hex | **Selected colour.** Behind the selected result. |
 | `selected_text` | `"bright"` | colour name or hex | **Selected text.**  |
+| `selected_match` | `"auto"` | colour name or hex | **Selected match colour.** The letters you typed, in the selected result. auto = the accent colour, or the selected text colour when the accent would be hard to see on the selected colour. |
 | `frame` | `"none"` |  | Smooth style: a frame (Frames page) for the whole launcher instead of the plain box above. none = plain. |
 | `row_frame` | `"none"` |  | **Row frame.** A frame for each result. none = plain rows. |
 | `selected_frame` | `"auto"` |  | **Selected frame.** A frame for the selected result. auto = the row frame. |
@@ -592,6 +725,7 @@ See 6e.
 | `heading` | `""` |  | A big heading above the search line, e.g. APPS. Empty = none. |
 | `heading_note` | `""` |  | **Heading note.** Small text after the heading. |
 | `heading_font` | `""` |  | **Heading font.** Empty = the theme's font. |
+| `heading_color` | `"auto"` | colour name or hex | **Heading colour.** auto = the selected text colour, or the text colour when that would be hard to see on the background. |
 | `top_line` | `""` |  | **Top line.** A small line at the very top. {count} = how many results. Empty = none. |
 | `bottom_line` | `""` |  | **Bottom line.** A small line at the bottom, e.g. key hints. {count} = how many results, {selected} = which one is selected. Empty = none. |
 | `spacing` | `0` | -5 to 50 | **Letter spacing.** Extra pixels between letters of the heading, top and bottom lines. |
@@ -636,11 +770,15 @@ Box designs, picked by name (see 6b5).
 | `fill_opacity` | `0.9` | 0 to 1 | **Fill opacity.**  |
 | `fill2` | `"none"` | colour name or hex | **Fill to.** A second colour: the fill fades from Fill to this one. none = one colour. |
 | `fill_angle` | `90` | -360 to 360 | **Fade angle.** Direction of the fade, in degrees (90 = top to bottom). |
-| `pattern` | `"none"` | none, scanlines, grid, dots, diagonal, crosshatch, vlines | A pattern over the fill. |
+| `pattern` | `"none"` | none, scanlines, grid, dots, crosses, diagonal, crosshatch, vlines | A pattern over the fill. |
 | `pattern_color` | `"line"` | colour name or hex | **Pattern colour.**  |
 | `pattern_opacity` | `0.35` | 0 to 1 | **Pattern opacity.**  |
 | `pattern_spacing` | `4` | 2 to 200 | **Pattern spacing.** Pixels between the pattern's lines or dots. |
+| `pattern_size` | `1` | 0.5 to 50 | **Pattern size.** Thickness of the pattern's lines or dots, in pixels. |
 | `hover_fill` | `"none"` | colour name or hex | **Hover fill.** Fill colour under the mouse, when it does something on click. none = no change. |
+| `text_color` | `"none"` | colour name or hex | **Text colour.** Colour of the text inside (bar modules, buttons). none = the text's own colour. Set it for dark fills on a light theme (or the other way round). |
+| `hover_text` | `"none"` | colour name or hex | **Hover text.** Colour of the text inside (bar modules, buttons) while the mouse is over it. none = unchanged. Set it when Hover fill is close to the text colour. |
+| `hover_wipe` | `0` | 0 to 2000 | **Hover wipe.** The hover fill slides in from the left over this many milliseconds instead of appearing at once. 0 = at once. Used by menus and lists that animate. |
 | `border` | `"line"` | colour name or hex | Border colour. none = no border. |
 | `border_width` | `1` | 0 to 50 | **Border width.**  |
 | `border_opacity` | `1` | 0 to 1 | **Border opacity.**  |
@@ -672,6 +810,8 @@ Box designs, picked by name (see 6b5).
 | `corner_mark` | `"none"` | colour name or hex | **Corner mark.** A small filled triangle in one corner. none = no mark. |
 | `mark_corner` | `"bottom_right"` | top_left, top_right, bottom_left, bottom_right | **Mark corner.**  |
 | `mark_size` | `8` | 1 to 200 | **Mark size.**  |
+| `corner_squares` | `"none"` | colour name or hex | **Corner squares.** Small filled squares centred on all four corners. none = no squares. |
+| `corner_square_size` | `6` | 1 to 100 | **Square size.**  |
 | `stripe` | `"none"` | colour name or hex | A thick stripe along one side. none = no stripe. |
 | `stripe_side` | `"left"` | left, right, top, bottom | **Stripe side.**  |
 | `stripe_width` | `3` | 0.5 to 100 | **Stripe width.**  |
@@ -689,6 +829,28 @@ Box designs, picked by name (see 6b5).
 | `glow_size` | `8` | 1 to 100 | **Glow size.**  |
 | `glow_opacity` | `0.35` | 0 to 1 | **Glow strength.**  |
 | `shadow` | `0` | -1 to 1 | A soft shadow under the box. -1 = the theme's. |
+
+### animations.toml [[tween]] (in a theme folder)
+
+Animations for widgets (see 6i).
+
+| Option | Default | Allowed | What it does |
+|---|---|---|---|
+| `name` | `"tween"` |  | A name for this animation (only for you). |
+| `target` | `""` |  | Which widget(s) it plays on: a widget's Name, type:clock for every widget of a type, or * for every widget. |
+| `trigger` | `"appear"` | appear, hover, click, loop | When it plays. appear = when the theme loads, coming in FROM the goal (e.g. Move Y 40 + Opacity 0 = rises and fades in). hover = goes to the goal while the mouse is over it, back when it leaves. click = to the goal and back once when clicked. loop = keeps playing (see Repeat and Reverses). |
+| `time` | `0.4` | 0.01 to 60 | **Time.** How long one play takes, in seconds. |
+| `style` | `"quad"` | linear, sine, quad, cubic, quart, quint, exponential, circular, back, elastic, bounce | **Easing style.** The shape of the motion: linear = steady, sine/quad/cubic/quart/quint = gentle to strong slow-downs, exponential and circular = sharp, back = overshoots a little, elastic = springs, bounce = bounces. |
+| `direction` | `"out"` | in, out, inout | **Easing direction.** out = fast start, gentle end (most natural for things arriving). in = gentle start, fast end. inout = gentle at both ends. |
+| `delay` | `0` | 0 to 60 | Seconds to wait before it starts. |
+| `stagger` | `0` | 0 to 10 | With several targets (type:… or *): each one starts this many seconds after the one before, so they come in one after another. |
+| `repeat` | `-1` | -1 to 1000 | loop: how many more times it plays after the first. -1 = for ever. |
+| `reverses` | `true` | true, false | loop: play back to the start after reaching the goal (each play goes there and back). |
+| `move_x` | `0` | -4000 to 4000 | **Move X.** Pixels to the right at the goal (negative = left). |
+| `move_y` | `0` | -4000 to 4000 | **Move Y.** Pixels down at the goal (negative = up). |
+| `scale` | `1` | 0 to 10 | Size at the goal: 1 = as it is, 1.05 = 5% bigger, 0.8 = smaller. From the widget's centre. |
+| `opacity` | `1` | 0 to 1 | See-through-ness at the goal: 1 = as it is, 0 = invisible. |
+| `rotate` | `0` | -3600 to 3600 | **Rotate.** Degrees turned at the goal (clockwise). |
 
 ### wallpaper.toml (top)
 
@@ -708,6 +870,16 @@ Box designs, picked by name (see 6b5).
 | `file` | `""` |  | Picture file (PNG/JPG). A file name is looked for in the theme folder and config\images. |
 | `fit` | `"cover"` | cover, contain, stretch, center | How the picture fills the screen. |
 | `dim` | `0` | 0 to 1 | Darken the picture (0 = not at all, 1 = black). |
+| `pattern` | `"none"` | none, scanlines, grid, dots, crosses, diagonal, crosshatch, vlines | **Pattern.** A pattern drawn over the whole backdrop (smooth themes): dots, lines, a grid… none = no pattern. |
+| `pattern_color` | `"line"` | colour name or hex | **Pattern colour.**  |
+| `pattern_opacity` | `0.5` | 0 to 1 | **Pattern opacity.**  |
+| `pattern_spacing` | `24` | 2 to 400 | **Pattern spacing.** Pixels between the pattern's lines or dots. |
+| `pattern_size` | `2` | 0.5 to 50 | **Pattern size.** Thickness of the lines or dots, in pixels. |
+| `pattern2` | `"none"` | none, scanlines, grid, dots, crosses, diagonal, crosshatch, vlines | **Pattern 2.** A second pattern on top of the first (e.g. faint scanlines over dots). none = no second pattern. |
+| `pattern2_color` | `"line"` | colour name or hex | **Pattern 2 colour.**  |
+| `pattern2_opacity` | `0.15` | 0 to 1 | **Pattern 2 opacity.**  |
+| `pattern2_spacing` | `3` | 2 to 400 | **Pattern 2 spacing.**  |
+| `pattern2_size` | `1` | 0.5 to 50 | **Pattern 2 size.**  |
 
 ### wallpaper.toml [cursor] (mouse effect)
 
@@ -923,6 +1095,7 @@ The bar along the top (or bottom) of the screen.
 | `module_padding` | `8` | 0 to 100 | **Module padding.** Space inside a module frame, left and right, in pixels. |
 | `module_inset` | `3` | 0 to 100 | **Module inset.** Space between a module frame and the top and bottom of the bar, in pixels. |
 | `join_gap` | `8` | 0 to 100 | **Joined gap.** Space between modules that share a frame (Join), in pixels. |
+| `hover_color` | `"accent"` | colour name or hex | **Hover colour.** The highlight under the mouse on modules that do something on click (without a frame). |
 
 ### bar.toml [[left]] / [[center]] / [[right]] type = "text"
 
@@ -936,6 +1109,10 @@ Text with {values}. Most modules are this: clock, CPU, media, volume… (the set
 | `bold` | `false` | true, false | Bold text (smooth style). |
 | `frame` | `"auto"` |  | A frame around this module. auto = the bar's Module frame, none = no frame. Smooth style. |
 | `join` | `false` | true, false | Share one frame with the next module (e.g. a label, a meter and a number in one box). |
+| `caption` | `""` |  | A small label above the module (e.g. APPS), with {values}. Empty = none. Smooth style. |
+| `caption_color` | `"dim"` | colour name or hex | **Caption colour.**  |
+| `caption_spacing` | `2` | -5 to 50 | **Caption spacing.** Extra pixels between the caption's letters. |
+| `caption_below` | `false` | true, false | **Caption below.** Put the caption under the module instead of above it. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
 | `on_right_click` | `""` |  | **On right-click.**  |
 | `on_scroll_up` | `""` |  | **On scroll up.**  |
@@ -958,6 +1135,10 @@ A small bar showing a value from 0 to 100%.
 | `bold` | `false` | true, false | Bold text (smooth style). |
 | `frame` | `"auto"` |  | A frame around this module. auto = the bar's Module frame, none = no frame. Smooth style. |
 | `join` | `false` | true, false | Share one frame with the next module (e.g. a label, a meter and a number in one box). |
+| `caption` | `""` |  | A small label above the module (e.g. APPS), with {values}. Empty = none. Smooth style. |
+| `caption_color` | `"dim"` | colour name or hex | **Caption colour.**  |
+| `caption_spacing` | `2` | -5 to 50 | **Caption spacing.** Extra pixels between the caption's letters. |
+| `caption_below` | `false` | true, false | **Caption below.** Put the caption under the module instead of above it. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
 | `on_right_click` | `""` |  | **On right-click.**  |
 | `on_scroll_up` | `""` |  | **On scroll up.**  |
@@ -985,6 +1166,10 @@ A tiny history graph.
 | `bold` | `false` | true, false | Bold text (smooth style). |
 | `frame` | `"auto"` |  | A frame around this module. auto = the bar's Module frame, none = no frame. Smooth style. |
 | `join` | `false` | true, false | Share one frame with the next module (e.g. a label, a meter and a number in one box). |
+| `caption` | `""` |  | A small label above the module (e.g. APPS), with {values}. Empty = none. Smooth style. |
+| `caption_color` | `"dim"` | colour name or hex | **Caption colour.**  |
+| `caption_spacing` | `2` | -5 to 50 | **Caption spacing.** Extra pixels between the caption's letters. |
+| `caption_below` | `false` | true, false | **Caption below.** Put the caption under the module instead of above it. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
 | `on_right_click` | `""` |  | **On right-click.**  |
 | `on_scroll_up` | `""` |  | **On scroll up.**  |
@@ -1005,6 +1190,10 @@ Windows' virtual desktops; click one to switch, scroll to move between them.
 | `bold` | `false` | true, false | Bold text (smooth style). |
 | `frame` | `"auto"` |  | A frame around this module. auto = the bar's Module frame, none = no frame. Smooth style. |
 | `join` | `false` | true, false | Share one frame with the next module (e.g. a label, a meter and a number in one box). |
+| `caption` | `""` |  | A small label above the module (e.g. APPS), with {values}. Empty = none. Smooth style. |
+| `caption_color` | `"dim"` | colour name or hex | **Caption colour.**  |
+| `caption_spacing` | `2` | -5 to 50 | **Caption spacing.** Extra pixels between the caption's letters. |
+| `caption_below` | `false` | true, false | **Caption below.** Put the caption under the module instead of above it. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
 | `on_right_click` | `""` |  | **On right-click.**  |
 | `on_scroll_up` | `""` |  | **On scroll up.**  |
@@ -1030,6 +1219,10 @@ Empty space.
 | `bold` | `false` | true, false | Bold text (smooth style). |
 | `frame` | `"auto"` |  | A frame around this module. auto = the bar's Module frame, none = no frame. Smooth style. |
 | `join` | `false` | true, false | Share one frame with the next module (e.g. a label, a meter and a number in one box). |
+| `caption` | `""` |  | A small label above the module (e.g. APPS), with {values}. Empty = none. Smooth style. |
+| `caption_color` | `"dim"` | colour name or hex | **Caption colour.**  |
+| `caption_spacing` | `2` | -5 to 50 | **Caption spacing.** Extra pixels between the caption's letters. |
+| `caption_below` | `false` | true, false | **Caption below.** Put the caption under the module instead of above it. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
 | `on_right_click` | `""` |  | **On right-click.**  |
 | `on_scroll_up` | `""` |  | **On scroll up.**  |
@@ -1048,6 +1241,10 @@ Empty space.
 | `bold` | `false` | true, false | Bold text (smooth style). |
 | `frame` | `"auto"` |  | A frame around this module. auto = the bar's Module frame, none = no frame. Smooth style. |
 | `join` | `false` | true, false | Share one frame with the next module (e.g. a label, a meter and a number in one box). |
+| `caption` | `""` |  | A small label above the module (e.g. APPS), with {values}. Empty = none. Smooth style. |
+| `caption_color` | `"dim"` | colour name or hex | **Caption colour.**  |
+| `caption_spacing` | `2` | -5 to 50 | **Caption spacing.** Extra pixels between the caption's letters. |
+| `caption_below` | `false` | true, false | **Caption below.** Put the caption under the module instead of above it. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
 | `on_right_click` | `""` |  | **On right-click.**  |
 | `on_scroll_up` | `""` |  | **On scroll up.**  |
@@ -1057,6 +1254,69 @@ Empty space.
 | `icon_size` | `0` | 0 to 128 | **Icon size.** In pixels. 0 = a bit bigger than the text. |
 | `style` | `"original"` | original, tint, mono | **Icon style.** original = the app's own icon, tint = recoloured, mono = a flat silhouette in the module's colour. |
 | `spacing` | `6` | 0 to 100 | Space between icons, in pixels. |
+
+### bar.toml [[left]] / [[center]] / [[right]] type = "tasks"
+
+Empty space.
+
+| Option | Default | Allowed | What it does |
+|---|---|---|---|
+| `enabled` | `true` | true, false | Show this module. |
+| `color` | `"text"` | colour name or hex | Text colour (colour markup in the format overrides it). |
+| `background` | `"auto"` | colour name or hex | A pill behind this module. auto = the bar's Module background, none = no pill. |
+| `bold` | `false` | true, false | Bold text (smooth style). |
+| `frame` | `"auto"` |  | A frame around this module. auto = the bar's Module frame, none = no frame. Smooth style. |
+| `join` | `false` | true, false | Share one frame with the next module (e.g. a label, a meter and a number in one box). |
+| `caption` | `""` |  | A small label above the module (e.g. APPS), with {values}. Empty = none. Smooth style. |
+| `caption_color` | `"dim"` | colour name or hex | **Caption colour.**  |
+| `caption_spacing` | `2` | -5 to 50 | **Caption spacing.** Extra pixels between the caption's letters. |
+| `caption_below` | `false` | true, false | **Caption below.** Put the caption under the module instead of above it. |
+| `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `on_right_click` | `""` |  | **On right-click.**  |
+| `on_scroll_up` | `""` |  | **On scroll up.**  |
+| `on_scroll_down` | `""` |  | **On scroll down.**  |
+| `format` | `"{app}"` |  | What each window shows: {title} = the window's title, {app} = the program's name. Empty = just the icon. |
+| `max_length` | `18` | 0 to 200 | **Max length.** Cut longer text with … (0 = no limit). |
+| `icons` | `true` | true, false | **Show icons.**  |
+| `icon_size` | `0` | 0 to 128 | **Icon size.** In pixels. 0 = a bit bigger than the text. |
+| `style` | `"original"` | original, tint, mono | **Icon style.** original = the program's own icon, mono = a flat silhouette in the module's colour. |
+| `task_frame` | `"none"` |  | **Task frame.** A frame around each window's button. none = no frame. |
+| `active_frame` | `"none"` |  | **Active frame.** A frame for the window in front. none = the same as Task frame. |
+| `active_color` | `"auto"` | colour name or hex | **Active colour.** Text colour of the window in front. |
+| `minimised_color` | `"dim"` | colour name or hex | **Minimised colour.** Text colour of minimised windows. |
+| `max_count` | `12` | 1 to 60 | **Most shown.** Show at most this many windows. |
+| `spacing` | `6` | 0 to 100 | Space between windows, in pixels. |
+| `combine` | `false` | true, false | **Group by program.** One button per program instead of per window ({count} = how many windows). Clicking it again brings its next window to the front. |
+| `right_click` | `"none"` | none, close, minimise, maximise | **Right-click.** What right-clicking a window's button does. |
+| `hide` | `[]` |  | **Leave out.** Programs not to show: parts of their names (e.g. Settings). |
+
+### bar.toml [[left]] / [[center]] / [[right]] type = "tray"
+
+Empty space.
+
+| Option | Default | Allowed | What it does |
+|---|---|---|---|
+| `enabled` | `true` | true, false | Show this module. |
+| `color` | `"text"` | colour name or hex | Text colour (colour markup in the format overrides it). |
+| `background` | `"auto"` | colour name or hex | A pill behind this module. auto = the bar's Module background, none = no pill. |
+| `bold` | `false` | true, false | Bold text (smooth style). |
+| `frame` | `"auto"` |  | A frame around this module. auto = the bar's Module frame, none = no frame. Smooth style. |
+| `join` | `false` | true, false | Share one frame with the next module (e.g. a label, a meter and a number in one box). |
+| `caption` | `""` |  | A small label above the module (e.g. APPS), with {values}. Empty = none. Smooth style. |
+| `caption_color` | `"dim"` | colour name or hex | **Caption colour.**  |
+| `caption_spacing` | `2` | -5 to 50 | **Caption spacing.** Extra pixels between the caption's letters. |
+| `caption_below` | `false` | true, false | **Caption below.** Put the caption under the module instead of above it. |
+| `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `on_right_click` | `""` |  | **On right-click.**  |
+| `on_scroll_up` | `""` |  | **On scroll up.**  |
+| `on_scroll_down` | `""` |  | **On scroll down.**  |
+| `icon_size` | `0` | 0 to 128 | **Icon size.** In pixels. 0 = a bit bigger than the text. |
+| `style` | `"original"` | original, tint, mono | **Icon style.** original = the programs' own icons, tint = recoloured, mono = flat silhouettes in the module's colour. |
+| `spacing` | `6` | 0 to 100 | Space between icons, in pixels. |
+| `icon_frame` | `"none"` |  | **Icon frame.** A frame around each icon. none = no frame. |
+| `hide` | `[]` |  | **Leave out.** Icons not to show: parts of their program's name or tooltip (e.g. OneDrive). |
+| `max_count` | `16` | 1 to 60 | **Most shown.**  |
+| `show_hidden` | `false` | true, false | **Show hidden.** Also show icons their programs asked to hide. |
 
 ### widgets.toml [[widget]] type = "shortcuts"
 
@@ -1069,6 +1329,7 @@ your shortcuts in a grid
 | `anchor` | `"top_left"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `16` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `16` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1076,6 +1337,8 @@ your shortcuts in a grid
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1112,6 +1375,7 @@ a big clock and date
 | `anchor` | `"top_right"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `40` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `40` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1119,6 +1383,8 @@ a big clock and date
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1145,6 +1411,10 @@ a big clock and date
 | `shadow` | `"none"` | colour name or hex | **Shadow colour.** A shadow behind the big digits. none = no shadow. |
 | `big_scale` | `5` | 1 to 20 | **Big size.** Smooth style: size of the big line compared with normal text. |
 | `big_font` | `"Segoe UI Light"` |  | **Big font.** Smooth style: font of the big line. Empty = the theme's font. |
+| `spacing` | `0` | -5 to 80 | **Letter spacing.** Smooth style: extra pixels between the big line's letters. |
+| `subtitle_spacing` | `0` | -5 to 50 | **Subtitle spacing.** Smooth style: extra pixels between the subtitle's letters. |
+| `subtitle_color` | `"auto"` | colour name or hex | **Subtitle colour.** auto = the text colour. |
+| `subtitle_size` | `"large"` | small, normal, large | **Subtitle size.**  |
 
 ### widgets.toml [[widget]] type = "system"
 
@@ -1157,6 +1427,7 @@ CPU, memory, disk, network with meters and graphs
 | `anchor` | `"top_right"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `16` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `260` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1164,6 +1435,8 @@ CPU, memory, disk, network with meters and graphs
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1202,6 +1475,7 @@ what's playing, with album art and controls
 | `anchor` | `"bottom_right"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `40` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `40` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1209,6 +1483,8 @@ what's playing, with album art and controls
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1244,6 +1520,10 @@ what's playing, with album art and controls
 | `visualiser_peak` | `"accent"` | colour name or hex | **Visualiser peak colour.** Colour of the tallest bars. |
 | `visualiser_fps` | `24` | 5 to 60 | **Visualiser rate.** Frames per second while it moves (higher = smoother, more CPU). |
 | `controls` | `true` | true, false | Show previous / play-pause / next buttons. |
+| `prev_label` | `""` |  | **Previous button.** What the button shows: text or an icon, e.g. {icon:skip_previous} (Icons page). Empty = the built-in symbol. |
+| `play_label` | `""` |  | **Play button.** e.g. {icon:play_arrow}. Empty = the built-in symbol. |
+| `pause_label` | `""` |  | **Pause button.** e.g. {icon:pause}. Empty = the built-in symbol. |
+| `next_label` | `""` |  | **Next button.** e.g. {icon:skip_next}. Empty = the built-in symbol. |
 | `hide_when_idle` | `true` | true, false | **Hide when nothing plays.** Hide the whole panel when no media app is open. |
 
 ### widgets.toml [[widget]] type = "calendar"
@@ -1257,6 +1537,7 @@ this month
 | `anchor` | `"bottom_left"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `360` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `40` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1264,6 +1545,8 @@ this month
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1299,6 +1582,7 @@ weather and forecast for a city
 | `anchor` | `"bottom_right"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `420` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `40` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1306,6 +1590,8 @@ weather and forecast for a city
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1344,6 +1630,7 @@ any text, with live values like {cpu} and colours
 | `anchor` | `"center"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `16` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `0` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1351,6 +1638,8 @@ any text, with live values like {cpu} and colours
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1374,6 +1663,9 @@ any text, with live values like {cpu} and colours
 | `size` | `"normal"` | small, normal, large, title |  |
 | `align` | `"left"` | left, center, right |  |
 | `mono` | `false` | true, false | Use the theme's monospace font (lines up columns and ASCII art). |
+| `spacing` | `0` | -5 to 50 | **Letter spacing.** Smooth style: extra pixels between letters (wide, typed-looking headings). |
+| `text_shadow` | `"none"` | colour name or hex | **Text shadow.** Smooth style: the text printed again a little lower and to the right, in this colour, under it. none = no shadow. |
+| `shadow_offset` | `2` | 0 to 40 | **Shadow offset.** How far the text shadow sits from the text, in pixels. |
 
 ### widgets.toml [[widget]] type = "command"
 
@@ -1386,6 +1678,7 @@ the output of a command or script
 | `anchor` | `"left"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `16` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `16` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1393,6 +1686,8 @@ the output of a command or script
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1428,6 +1723,7 @@ ASCII logo with system info (neofetch style)
 | `anchor` | `"center"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `16` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `200` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1435,6 +1731,8 @@ ASCII logo with system info (neofetch style)
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1469,6 +1767,7 @@ a picture
 | `anchor` | `"right"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `16` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `16` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1476,6 +1775,8 @@ a picture
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1511,6 +1812,7 @@ plays a video or an ASCII clip (as characters or the real picture)
 | `anchor` | `"center"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `0` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `0` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1518,6 +1820,8 @@ plays a video or an ASCII clip (as characters or the real picture)
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1559,6 +1863,7 @@ sound controls: output device, master and per-app volume
 | `anchor` | `"bottom_right"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `40` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `220` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1566,6 +1871,8 @@ sound controls: output device, master and per-app volume
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1606,6 +1913,7 @@ lines that keep coming in: made-up hex, logs or values (a live-looking readout)
 | `anchor` | `"top_right"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
 | `offset_x` | `16` |  | **Offset X.** Move it right (or left if negative), in pixels. |
 | `offset_y` | `60` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
 | `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
 | `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
 | `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
@@ -1613,6 +1921,8 @@ lines that keep coming in: made-up hex, logs or values (a live-looking readout)
 | `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
 | `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
 | `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
@@ -1642,6 +1952,121 @@ lines that keep coming in: made-up hex, logs or values (a live-looking readout)
 | `mono` | `true` | true, false | Use the theme's monospace font (lines up columns). |
 | `size` | `"small"` | small, normal, large |  |
 
+### widgets.toml [[widget]] type = "menu"
+
+a menu screen: your shortcut groups as tabs, the chosen group's shortcuts as a list, details of the chosen one
+
+| Option | Default | Allowed | What it does |
+|---|---|---|---|
+| `enabled` | `true` | true, false | Show this panel. |
+| `name` | `""` |  | A name for this panel, so another panel can draw a line to it (Link to). |
+| `anchor` | `"top_left"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
+| `offset_x` | `20` |  | **Offset X.** Move it right (or left if negative), in pixels. |
+| `offset_y` | `140` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"both"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
+| `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
+| `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
+| `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
+| `corner_radius` | `-1` | -1 to 200 | **Corner radius.** Smooth style, in pixels. -1 = the theme's. |
+| `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
+| `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
+| `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
+| `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
+| `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
+| `link_width` | `1` | 0.5 to 20 | **Link width.**  |
+| `link_lines` | `1` | 1 to 5 | **Link lines.** How many lines side by side. |
+| `link_gap` | `5` | 1 to 50 | **Link gap.** Pixels between the lines. |
+| `link_shape` | `"elbow"` | elbow, straight | **Link shape.** elbow = a 45° bend then straight, straight = one straight line. |
+| `link_ends` | `"dot"` | none, dot, both | **Link ends.** A small square where the line meets the panels. |
+| `tabs` | `[]` |  | **Tabs.** The shortcut groups shown as tabs, in order (names as in the shortcuts' Group). Empty = every group: the Shortcuts page's groups first, then any other group a shortcut names. |
+| `ungrouped_tab` | `"Other"` |  | **Ungrouped tab.** A tab for the shortcuts that have no group, with this name. Empty = leave them out. |
+| `launch` | `"double_click"` | double_click, click | **Open with.** double_click = a click selects (and shows the details), a double click opens. click = a click opens. |
+| `wipe_ms` | `160` | 0 to 2000 | **Hover wipe.** Milliseconds for the dark fill to slide in under the mouse (tabs and list). 0 = at once. |
+| `wipe_style` | `"cubic"` | linear, sine, quad, cubic, quart, quint, exponential, circular, back, elastic, bounce | **Wipe easing.** The shape of the hover wipe's motion (as in animations): cubic = quick then settling, linear = steady, back = overshoots, bounce, elastic… |
+| `wipe_direction` | `"out"` | in, out, inout | **Wipe direction.** out = fast start, gentle end. in = gentle start, fast end. inout = gentle at both ends. |
+| `upper` | `true` | true, false | **Capitals.** Tabs and the heading in capitals. |
+| `tab_layout` | `"spread"` | spread, packed | **Tab layout.** spread = the tabs fill the width with even gaps. packed = side by side from the left. |
+| `tab_height` | `28` | 12 to 200 | **Tab height.**  |
+| `tab_gap` | `18` | 0 to 400 | **Tab gap.** Pixels between tabs (packed), or the least gap (spread). |
+| `tab_inset` | `40` | 0 to 1000 | **Tab inset.** Space at the left and right ends of the tab row, in pixels. |
+| `tab_padding` | `12` | 0 to 100 | **Tab padding.** Space inside a tab, left and right. |
+| `tab_spacing` | `2` | -5 to 50 | **Tab letter spacing.**  |
+| `icon_box` | `20` | 0 to 100 | **Icon box.** Size of the square behind a tab's icon (the group's Icon). 0 = no box, just the icon. |
+| `tab_counts` | `false` | true, false | **Show counts.** Show how many shortcuts each tab holds, like (5). |
+| `tab_frame` | `"none"` |  | **Tab frame.** A frame (Frames page) for the tabs. none = a plain plate in the colours below (its Hover fill becomes Active colour). |
+| `tab_color` | `"surface"` | colour name or hex | **Tab colour.**  |
+| `tab_text` | `"text"` | colour name or hex | **Tab text.**  |
+| `active_color` | `"text"` | colour name or hex | **Active colour.** The fill of the chosen tab / item and the one under the mouse. |
+| `active_text` | `"bg"` | colour name or hex | **Active text.**  |
+| `rule` | `"band"` | none, solid, band | **Rule.** The line under the tab row. band = a line, dashes and little dot triangles. |
+| `rule_color` | `"text"` | colour name or hex | **Rule colour.**  |
+| `rule_gap` | `14` | 0 to 200 | **Rule gap.** Pixels between the tabs and the rule. |
+| `heading` | `true` | true, false | **Show heading.** The chosen tab's name in big letters, with the group's Subtitle and Description under it. |
+| `heading_gap` | `36` | 0 to 400 | **Heading gap.** Pixels between the rule and the heading. |
+| `heading_scale` | `2.3` | 1 to 8 | **Heading size.** Size of the big name compared with normal text. |
+| `heading_spacing` | `4` | -5 to 60 | **Heading spacing.**  |
+| `heading_shadow` | `"none"` | colour name or hex | **Heading shadow.** The heading printed again a little lower right, in this colour. none = no shadow. |
+| `heading_color` | `"text"` | colour name or hex | **Heading colour.**  |
+| `subtitle_color` | `"dim"` | colour name or hex | **Subtitle colour.**  |
+| `subtitle_spacing` | `3` | -5 to 50 | **Subtitle spacing.**  |
+| `inset` | `40` | 0 to 1000 | **Heading inset.** Space from the left edge to the heading and the list. |
+| `list_width` | `240` | 60 to 2000 | **List width.**  |
+| `item_height` | `32` | 12 to 200 | **Item height.**  |
+| `item_gap` | `12` | 0 to 100 | **Item gap.** Pixels between items. |
+| `list_gap` | `36` | 0 to 400 | **List gap.** Pixels between the heading and the list. |
+| `item_frame` | `"none"` |  | **Item frame.** A frame for the items. none = a plain plate in the tab colours. |
+| `bullet` | `10` | 0 to 60 | **Bullet size.** The little square before each name. 0 = none. |
+| `rail_color` | `"line"` | colour name or hex | **Rail colour.** A thick line down the left of the list, with a mark at the chosen item. none = no rail. |
+| `rail_width` | `6` | 1 to 40 | **Rail width.**  |
+| `details` | `true` | true, false | **Show details.** A panel beside the list about the chosen shortcut: what it is, where it points, open buttons. |
+| `details_width` | `420` | 100 to 3000 | **Details width.**  |
+| `details_frame` | `"none"` |  | **Details frame.** A frame for the panel (its title strip holds the name). none = a dark title strip and no box. |
+| `label_color` | `"dim"` | colour name or hex | **Label colour.**  |
+| `row_line` | `"line"` | colour name or hex | **Row lines.** A faint line between rows. none = no lines. |
+
+### widgets.toml [[widget]] type = "divider"
+
+a line across or down the screen: solid, dashed, dotted, double or a printed-form band
+
+| Option | Default | Allowed | What it does |
+|---|---|---|---|
+| `enabled` | `true` | true, false | Show this panel. |
+| `name` | `""` |  | A name for this panel, so another panel can draw a line to it (Link to). |
+| `anchor` | `"top"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
+| `offset_x` | `20` |  | **Offset X.** Move it right (or left if negative), in pixels. |
+| `offset_y` | `200` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"width"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
+| `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
+| `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
+| `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
+| `corner_radius` | `-1` | -1 to 200 | **Corner radius.** Smooth style, in pixels. -1 = the theme's. |
+| `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
+| `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
+| `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
+| `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
+| `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
+| `link_width` | `1` | 0.5 to 20 | **Link width.**  |
+| `link_lines` | `1` | 1 to 5 | **Link lines.** How many lines side by side. |
+| `link_gap` | `5` | 1 to 50 | **Link gap.** Pixels between the lines. |
+| `link_shape` | `"elbow"` | elbow, straight | **Link shape.** elbow = a 45° bend then straight, straight = one straight line. |
+| `link_ends` | `"dot"` | none, dot, both | **Link ends.** A small square where the line meets the panels. |
+| `direction` | `"horizontal"` | horizontal, vertical | Which way the line runs. |
+| `length` | `400` | 1 to 8000 | Length in pixels (when it isn't stretched to the screen's edges with Stretch). |
+| `style` | `"solid"` | solid, dashed, dotted, double, band | solid = one line. dashed = dashes. dotted = dots. double = two thin lines. band = a line, a row of dashes under it and a row of little dot triangles (a printed-form look). |
+| `thickness` | `2` | 0.5 to 100 | Thickness of the line, in pixels. |
+| `line_color` | `"text"` | colour name or hex | **Line colour.**  |
+| `line_opacity` | `1` | 0 to 1 | **Line opacity.**  |
+| `dash_length` | `14` | 1 to 400 | **Dash length.** dashed and band: length of each dash, in pixels. |
+| `dash_gap` | `4` | 1 to 400 | **Dash gap.** Pixels between dashes or dots. |
+| `band_spacing` | `36` | 4 to 400 | **Band spacing.** band: pixels between the dot triangles. |
+| `band_color` | `"auto"` | colour name or hex | **Band colour.** band: colour of the dashes and dots. auto = the line colour. |
+
 ### shortcuts.toml [[shortcut]]
 
 Your shortcuts, shared by every theme.
@@ -1652,7 +2077,8 @@ Your shortcuts, shared by every theme.
 | `target` | `""` |  | What it opens: a program, file, folder, shortcut (.lnk), website or shell: location. |
 | `arguments` | `""` |  | Extra command-line arguments (optional). |
 | `start_in` | `""` |  | **Start in.** Working folder (optional). |
-| `group` | `""` |  | Optional group name; a panel can show just one group. |
+| `group` | `""` |  | Optional group name; a panel can show just one group, and a menu shows each group as a tab. |
+| `description` | `""` |  | A short line about it (optional), shown by menus under the name. |
 | `image` | `""` |  | Your own picture for the icon (PNG/JPG/ICO). Empty = the app's own icon. |
 
 ### variables.toml [[variable]] (in a theme folder)

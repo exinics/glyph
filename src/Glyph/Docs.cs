@@ -21,7 +21,10 @@ internal static class Docs
         sb.AppendLine("lower-case name in the first column; a section like `[ui]` is the part of the file it lives in.").AppendLine();
 
         Section(sb, "glyph.toml (Glyph itself)", new AppSettings(), "");
-        Section(sb, "glyph.toml [performance]", new PerformanceOptions(), "");
+        Section(sb, "glyph.toml [performance]", new PerformanceOptions(), "Pick a preset for each power state; each preset below can be changed.");
+        Section(sb, "glyph.toml [performance.highest]", PresetOptions.MakeHighest(), "Everything at the screen's full frame rate and full quality.");
+        Section(sb, "glyph.toml [performance.balanced]", PresetOptions.MakeBalanced(), "Each theme as it's made.");
+        Section(sb, "glyph.toml [performance.low]", PresetOptions.MakeLow(), "Slow and simple, for the longest battery.");
         Section(sb, "glyph.toml [launcher] (what the launcher finds)", new Glyph.Launcher.LauncherSettings(), "See 6e.");
         Section(sb, "glyph.toml [tiling]", new Glyph.Tiling.TilingOptions(), "See 6f.");
         Section(sb, "hotkeys.toml [[hotkey]]", new HotkeyOptions(), "See 6g.");
@@ -33,6 +36,7 @@ internal static class Docs
         Section(sb, "theme.toml [launcher] (how the launcher looks)", new Glyph.Launcher.LauncherLook(), "See 6e.");
         Section(sb, "theme.toml [windows] (window frames)", new Glyph.Desktop.WindowFrameOptions(), "See 6h.");
         Section(sb, "frames.toml [[frame]] (in a theme folder)", new Glyph.Render.FrameOptions(), "Box designs, picked by name (see 6b5).");
+        Section(sb, "animations.toml [[tween]] (in a theme folder)", new Glyph.Render.TweenOptions(), "Animations for widgets (see 6i).");
         Section(sb, "wallpaper.toml (top)", new WallpaperOptions(), "");
         Section(sb, "wallpaper.toml [backdrop]", new BackdropOptions(), "");
         Section(sb, "wallpaper.toml [cursor] (mouse effect)", new CursorOptions(), "");
@@ -117,12 +121,13 @@ change appears within about a second.
 
 ## 1b. Installing on another PC, and updates
 
-1. Install the .NET 9 desktop runtime once: `winget install Microsoft.DotNet.DesktopRuntime.9`
-   (and ffmpeg for videos and the converter: `winget install Gyan.FFmpeg.Essentials`).
-2. Download `Glyph-win-x64.zip` from the newest release on GitHub (github.com/exinics/glyph/releases),
-   unzip it anywhere you like (e.g. `C:\Glyph`) and run `Glyph\bin\Glyph.exe`. The first start sets up the **operator**
-   theme and imports your desktop shortcuts into `Glyph\config`.
-3. Settings > General > *Start with Windows* to have it start by itself.
+1. Download `Glyph-Setup-x.y.z.exe` from the newest release on GitHub (github.com/exinics/glyph/releases) and run
+   it: pick the folder, Start menu shortcuts, "start when I sign in". It gets the .NET 9 desktop runtime if needed,
+   and offers to bring the settings of a Glyph you used before. (Or the zip: unzip anywhere, run `Glyph\bin\Glyph.exe`;
+   needs `winget install Microsoft.DotNet.DesktopRuntime.9`.)
+2. For videos and the converter: `winget install Gyan.FFmpeg.Essentials`.
+3. The first start sets up the **operator** theme and imports your desktop shortcuts into `config`.
+   Settings > General > *Start with Windows* turns starting by itself on or off.
 
 **Updates** (General > Updates): `auto` looks on GitHub 30 seconds after Glyph starts and every 6 hours, downloads a
 newer version and restarts into it (a few seconds); `ask` shows a note and an *Update* item in the tray menu; `off`
@@ -151,7 +156,7 @@ in or out is picked up within a second. Theme sync, window frames and the launch
 
 | Page | What's there |
 |---|---|
-| **Design** | A live preview of the theme you're editing. Click a widget, the bar, a bar module or the background to change it on the right; drag widgets to move them, drag the corner square to resize, and *Draw box ▾* to drag out a new box and choose what's in it. *Animate* lets the wallpaper and mouse effects play. The colour squares at the bottom change the theme's colours. *Pick colour* is an eyedropper: click anywhere on the preview to put that colour in the palette (as the accent with matching shades, or any colour). *Wallpaper colours…* finds the wallpaper's main colours and offers an accent or a whole palette made from them. |
+| **Design** | A live preview of the theme you're editing. Click a **part** of a widget (a tab, a list item, a panel's title strip, its contents, a button…), the bar, a bar module or the background to change it on the right: **Properties** shows just that part's options (*Whole widget* shows them all), **Look** the frame the part is drawn with (edit it there; it tells you what else uses that frame, and *Give this part its own copy* splits it off), **Animations** the widget's tweens (6i). Then drag widgets to move them, drag the corner square to resize, and *Draw box ▾* to drag out a new box and choose what's in it. *Animate* lets the wallpaper and mouse effects play. The colour squares at the bottom change the theme's colours. *Pick colour* is an eyedropper: click anywhere on the preview to put that colour in the palette (as the accent with matching shades, or any colour). *Wallpaper colours…* finds the wallpaper's main colours and offers an accent or a whole palette made from them. |
 | **Frames** | The theme's box designs (see 6b5), with a live preview. *New frame ▾* starts from a ready-made design. |
 | **Themes** | Your themes. *Use this theme* shows it on the desktop. *New theme…* and *Duplicate…* make a copy to change, so you never break a theme you like. Rename, delete, open the folder, or *Restore the built-in theme* to get operator back as it came. Clicking a theme picks it for editing in the other tabs (the line at the top says which one you're editing). |
 | **Colours & look** | The **palette** (every colour in the theme; double-click to change one, or type a hex code) and the theme's options: its **style**, the **character font**, the **smooth style** (panel colour and see-through-ness, corner roundness, border, shadow, font) and the **screen effects** (glow, scanlines…). |
@@ -162,7 +167,9 @@ in or out is picked up within a second. Theme sync, window frames and the launch
 | **Widgets** | Everything on the desktop: shortcut panels, clock, system monitor, music, calendar, weather, text, command output, system info, pictures, videos, sound controls. *Add widget ▾*, then change the selected one. |
 | **General** | Start with Windows, closing Wallpaper Engine, when to rest to save power; start / quit / restart Glyph, the converter, folders. |
 
-At the bottom of each list of options there's a short explanation of whichever option you click.
+At the bottom of each list of options there's a short explanation of whichever option you click. Options are grouped
+with where a thing sits first and its box and links last; switches read On / Off, and every colour option shows its
+colour beside the name.
 
 ## 3. Themes and styles
 
@@ -240,6 +247,10 @@ them as `settings.before-glyph.json`.
   Windows once and kept in `icons\cache`.
 - *Set picture…* copies your image into `icons\` and uses it; it's recoloured to match the theme
   unless the panel's icon style is *original*.
+- **Groups**: give shortcuts a *Group* (e.g. Games, Study) and a shortcuts panel can show one group, a bar *icons*
+  module can show one, and a **menu** widget shows every group as a tab (6c). *Groups (menu tabs)…* on the Shortcuts
+  page sets each group's tab order, icon (`{icon:name}`), subtitle and a sentence about it (`[[group]]` tables in
+  `shortcuts.toml`). A shortcut's *Description* is shown by menus.
 
 ## 6. The wallpaper
 
@@ -248,6 +259,10 @@ top; empty parts let the ones below show). The **mouse effect** lights up charac
 
 If nothing in the wallpaper moves (no animated layers, mouse effect off), Glyph stops drawing frames and
 only redraws when something changes, like the mouse moving over a shortcut.
+
+Smooth themes can lay up to two **patterns** over the whole backdrop (Wallpaper > Backdrop > *Pattern* and
+*Pattern 2*): dots, crosses, scanlines, a grid, vertical or diagonal lines, crosshatch, each with its own colour,
+see-through-ness, spacing and thickness. A dot grid with faint scanlines over it gives a printed-paper look.
 
 ## 6b. The bar
 
@@ -262,6 +277,25 @@ The bar pauses only for fullscreen apps and the lock screen. Set *Position* to b
 taskbar, and General > *Windows taskbar* to `hide` to remove Windows' own taskbar completely (it comes back when
 Glyph quits). With the taskbar hidden, its tray icons (including Glyph's) aren't visible: open Glyph's settings
 with a bar button (`settings`), `Glyph.lnk`, or the Start menu.
+
+**Glyph's bar as the taskbar.** Set General > *Windows taskbar* to `hide` and put the bar at the bottom: it then
+does the taskbar's jobs, each a module you can style like any other:
+- **Start**: the *Start menu button* preset (`keys:win`; right-click `keys:win+x`), plus *Notifications and calendar*
+  (`keys:win+n`), *Quick settings* (`keys:win+a`) and *Show desktop* (`keys:win+d`) presets.
+- **Pinned apps**: an *icons* module with your shortcuts' names (or a shortcuts group).
+- **Open windows**: the **tasks** module (below).
+- **Tray icons**: the **tray** module shows the notification-area icons (Discord, a VPN, Glyph's own…), which are
+  otherwise out of sight while Windows' taskbar is hidden. Left-click, double-click and right-click reach the program
+  just as on Windows' taskbar. *Leave out* hides icons by program name or tooltip. While a bar shows a tray module,
+  Glyph keeps a hidden tray window above Explorer's so programs send their icons to Glyph too; everything is passed
+  on to Explorer, so its own tray stays complete and nothing changes when Glyph quits.
+
+The **tasks** module lists the open windows like the taskbar does (icon and program name or window title); click
+one to bring it to the front, click the one in front to minimise it. *Group by program* gives one button per
+program (`{count}` = its windows; clicking again goes to its next window), *Right-click* can close, minimise or
+maximise, and *Leave out* skips programs by name. Any module can have a **Caption**: a small
+label above (or under) it, e.g. `APPS`, or `{window_app}` under the window title. Give a module a frame with only a
+left border (*Border sides* = left) to split the bar into sections with thin lines.
 
 ## 6b2. Boxes and the background
 
@@ -306,12 +340,15 @@ preview: type a sample title and pick *Show as* panel, window, bar module or but
 - **Shape**: any corner cut off at 45° (*Cut top-left* … *Cut bottom-left*), rounded corners, or the whole box
   leaning sideways (*Slant*).
 - **Fill**: a colour and see-through-ness, a fade to a second colour, a **pattern** over it (scanlines, grid, dots,
-  diagonal lines, crosshatch, vertical lines) and a different fill under the mouse (*Hover fill*).
+  diagonal lines, crosshatch, vertical lines, crosses; *Pattern size* = how thick) and a different fill under the
+  mouse (*Hover fill*). *Hover wipe* makes that fill slide in from the left (menus animate it). *Text colour* and
+  *Hover text* set the colour of the text inside (bar modules, buttons), e.g. light text on a dark plate.
 - **Border**: colour, width, dashes, only some sides, and a second **inner border**.
 - **Title**: *plain* (top-left inside), *bar* (a strip across the top), *tab* (a tab sticking up from the top edge,
   with a slanted side), *line* (the title with a line running to the right) or *above* (over the box). Its font,
   size, capitals and letter spacing, and a second text on the right (*Title right* on a widget, e.g. `LIVE`).
-- **Marks**: corner brackets ⌜ ⌟ on some or all corners, a filled triangle in one corner, a thick **stripe** on one
+- **Marks**: corner brackets ⌜ ⌟ on some or all corners, small filled **corner squares** on all four corners, a
+  filled triangle in one corner, a thick **stripe** on one
   side, a block of **hatch** lines ////// at a corner, **ruler ticks** along a side, a soft **glow** and a shadow.
 
 Things pick a frame by name: a widget's *Frame* (or every panel through Colours & look > Smooth style > *Panel
@@ -337,6 +374,26 @@ calendar, weather, text, command output, system info and pictures. Each sits aga
 they're drawn with characters (big block digits, braille graphs, ASCII album art), in smooth themes as
 panels with normal text, smooth bars and pictures.
 
+*Stretch* (Placement) makes a box reach the screen's edges: `width` runs from *Offset X* on the left to *Offset X*
+on the right, `height` from *Offset Y* at the top to *Offset Y* at the bottom, `both` does both. An empty text widget
+stretched to `both` with a frame is a border around the whole screen. Text widgets also have *Letter spacing* and a
+*Text shadow* (the text printed again a little lower right); the clock has letter spacing for both lines.
+
+- **menu**: a whole menu screen made from your shortcut groups (5). The groups are tabs across the top (with the
+  group's icon in a little box, spread across the width or packed), a ruled line under them (`band` = line, dashes
+  and dot triangles), the chosen group's name in big letters with its subtitle and sentence, its shortcuts as a list
+  of plates, and a details panel about the chosen one (what it is, where it points, *Open* and *Show in folder*).
+  A click on a tab or a shortcut chooses it; a double click opens a shortcut (or one click with *Open with* =
+  click). The dark fill slides in under the mouse over *Hover wipe* milliseconds. Scroll over the list when it's
+  long, or over the tabs to change tab. Tabs and plates use plain colours (Tab colour, Active colour…) or frames
+  (*Tab frame*, *Item frame*, *Details frame*).
+- **divider**: a line across or down the screen: solid, dashed, dotted, double, or `band`. With *Stretch* it runs
+  from edge to edge.
+
+Together these make, for example, a printed field-manual look: a ruled screen border with corner squares, a dotted
+ground with scanlines, a search box that opens the launcher, a centred clock, a menu of the shortcut groups, a
+status panel, and a ruled bar at the bottom with the window in front, the open windows and a tray section.
+
 ## 6d. Values, colours and actions in text
 
 Anywhere you can type text for the bar or a widget, you can use:
@@ -352,6 +409,7 @@ Anywhere you can type text for the bar or a widget, you can use:
 | `{volume}` `{muted}` `{volume_icon}` | speaker volume |
 | `{media_title}` `{media_artist}` `{media_album}` `{media_app}` `{media_state}` `{media_icon}` `{media_position}` `{media_length}` | what's playing |
 | `{window}` `{window:40}` | the active window's title (`:40` = at most 40 characters) |
+| `{window_app}` | the program whose window is in front (e.g. Firefox) |
 | `{desktop}` `{desktops}` `{desktop_name}` | virtual desktop number, count, name |
 | `{tiling}` | the tiling layout (dwindle, master, columns, rows, monocle) or off |
 | `{wifi}` `{wifi_signal}` `{network}` | the Wi-Fi network's name, its signal 0–100, and wifi / ethernet / mobile / none |
@@ -381,6 +439,20 @@ Anywhere you can type text for the bar or a widget, you can use:
 | `run:program arguments` | starts a program with arguments |
 | `settings` | opens Glyph's settings |
 | a path, website or `ms-settings:` page | opens it, like double-clicking |
+
+### Icons and fonts in text
+
+- **Icons:** `{icon:name}` anywhere text is shown (bar modules, widget text and titles, frame titles, the media
+  buttons' labels) draws an icon from Google's Material Symbols, e.g. `{icon:home}` `{icon:wifi}` `{icon:play_arrow}`
+  `[accent]{icon:favorite}[/]`. Settings > **Icons** shows all of them with a search: click one to copy its code.
+  Names are the ones on fonts.google.com/icons. Icons take the colour and size of the text around them.
+  Each theme's Colours & look sets *Icon style* (outlined, rounded, sharp: rounded and sharp are downloaded once into
+  `config\fonts` the first time they're used), *Filled icons* and *Icon size*. In terminal themes an icon fills one
+  character cell.
+- **Fonts:** every font setting has a list to pick from: Windows' fonts plus any font files in `config\fonts`.
+  Settings > **Fonts** > *Add font files…* takes `.ttf`/`.otf` files or a whole download from fonts.google.com (the
+  `.zip`). They're only used by Glyph (nothing is installed into Windows). Each widget can have its own font and size
+  (Box > Font, Font size; smooth style).
 
 ## 6e. The launcher (Alt+Space)
 
@@ -436,6 +508,27 @@ records the keys you press; *Does* is any action: `launcher`, the `tile:` ones, 
 uses shows *taken by another program*: pick other keys. Other programs can run actions too:
 `Glyph.exe --action tile:layout:master`.
 
+## 6i. Animations (tweens)
+
+Widgets can move, grow, turn and fade with **tweens**, the same idea as Roblox's TweenService: a tween goes from
+how the widget normally looks to a **goal** (*Move X / Y* in pixels, *Scale*, *Rotate* in degrees, *Opacity*) over
+a *Time*, with an **easing style** (`linear`, `sine`, `quad`, `cubic`, `quart`, `quint`, `exponential`, `circular`,
+`back`, `elastic`, `bounce`) and **direction** (`in`, `out`, `inout`), after a *Delay*. The **trigger** says when:
+
+- `appear`: when Glyph starts (or the tweens change), coming in from the goal: Move Y 40 + Opacity 0 = rises and
+  fades in. Saving other settings doesn't replay it.
+- `hover`: to the goal while the mouse is over the widget, back when it leaves (e.g. Move Y -4 = lifts).
+- `click`: to the goal and back once (Scale 0.95 = a press).
+- `loop`: over and over: *Repeat* more times (-1 = for ever), *Reverses* = there and back each time.
+
+Easiest on the Design page: pick a widget > **Animations** > *Add ▾* (fade in, rise in, slide in, pop in, lift or
+grow on hover, bounce on click, bob, breathe, spin), change it on the right, *▶ Play* to see it. They're kept per theme
+in `animations.toml` (`[[tween]]` tables). *Target* is a widget's *Name* (adding a tween names the widget if it has
+none), `type:clock` for every widget of a type, or `*` for every widget; with several, *Stagger* starts each one a
+little after the one before. Several tweens on one widget add up. Animations are drawn in smooth themes; clicks and
+hover still use the widget's normal place. `loop` tweens keep the desktop drawing frames (a little power), the rest
+only while they play. The menu's hover wipe has its own *Wipe easing* and *Wipe direction*.
+
 ## 6h. Window frames
 
 A theme can draw a frame around your windows (Colours & look > *Window frames*): *Mode* `focused` frames the window
@@ -489,6 +582,10 @@ be replaced.
   maximised windows, lock screen, battery saver) and stops drawing entirely when nothing moves.
 - Measured here: operator about 2% of one CPU core (its feeds and meters keep changing), about 77 MB of its own
   memory. A theme where nothing moves uses under 1%.
+- **Presets** (General > More > Performance): *plugged in*, *on battery* and *battery saver* each pick highest,
+  balanced, low or pause. Highest = the screen's full refresh rate, effects on, smoke worked out every frame, videos at
+  full speed; balanced = each theme as it's made; low = 15 fps, no screen effects, less detail. Every preset can be
+  changed (`[performance.highest]` etc.).
 - To save more: lower the wallpaper's frames per second, lower *update fps* on noise layers, or use fewer layers.
 
 ## 10. If something's wrong

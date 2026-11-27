@@ -133,7 +133,7 @@ internal sealed class InfoOptions
 
 internal sealed class FontOptions
 {
-    [Description("Any installed monospace font, e.g. Cascadia Mono, JetBrains Mono, Consolas.")]
+    [Description("Any installed monospace font, e.g. Cascadia Mono, JetBrains Mono, Consolas (or one in config\\fonts: the Fonts page)."), TypeConverter(typeof(FontNameConverter))]
     public string Font { get; set; } = "Cascadia Mono";
     [DisplayName("Font size"), Description("In pixels. Smaller = more, finer characters."), Range(6, 96)] public float FontSize { get; set; } = 14;
     [DisplayName("Font weight"), Choices("thin", "light", "normal", "medium", "semibold", "bold", "black"), TypeConverter(typeof(ChoicesConverter))] public string FontWeight { get; set; } = "normal";
@@ -141,15 +141,18 @@ internal sealed class FontOptions
     [DisplayName("Cell width"), Description("Force a cell width in pixels. 0 = from the font."), Range(0, 200)] public int CellWidth { get; set; }
     [DisplayName("Cell height"), Description("Force a cell height in pixels. 0 = from the font."), Range(0, 400)] public int CellHeight { get; set; }
 
-    [Browsable(false)] public string Key => $"{Font}|{FontSize}|{FontWeight}|{CellWidth}|{CellHeight}|{LineSpacing}";
+    [Browsable(false)] public string Key => $"{Font}|{FontSize}|{FontWeight}|{CellWidth}|{CellHeight}|{LineSpacing}|{Glyph.Render.Symbols.LookKey}";
 }
 
 internal sealed class UiOptions
 {
-    [Description("Font for text in the smooth style (any installed font).")]
+    [Description("Font for text in the smooth style: any installed font, or one in config\\fonts (the Fonts page)."), TypeConverter(typeof(FontNameConverter))]
     public string Font { get; set; } = "Segoe UI";
     [DisplayName("Font size"), Description("In pixels."), Range(6, 96)] public float FontSize { get; set; } = 13;
     [DisplayName("Bold titles"), Description("Panel titles in bold.")] public bool BoldTitles { get; set; } = true;
+    [DisplayName("Icon style"), Description("Look of icons written as {icon:name} anywhere (Google's Material Symbols; browse them on the Icons page). Rounded and sharp are downloaded once, the first time they're used."), Choices("outlined", "rounded", "sharp"), TypeConverter(typeof(ChoicesConverter))] public string IconStyle { get; set; } = "outlined";
+    [DisplayName("Filled icons"), Description("Solid icons instead of outlines.")] public bool IconFill { get; set; }
+    [DisplayName("Icon size"), Description("Size of icons next to the text they're in: 1 = the text's size."), Range(0.5, 3)] public float IconSize { get; set; } = 1.15f;
     [DisplayName("Corner radius"), Description("Roundness of panel corners, in pixels."), Range(0, 64)] public float CornerRadius { get; set; } = 12;
     [DisplayName("Panel colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string PanelColor { get; set; } = "surface";
     [DisplayName("Panel opacity"), Description("0 = invisible, 1 = solid."), Range(0, 1)] public float PanelOpacity { get; set; } = 0.85f;

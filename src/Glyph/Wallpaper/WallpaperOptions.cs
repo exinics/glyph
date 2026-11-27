@@ -93,6 +93,19 @@ internal sealed class BackdropOptions
     public string Fit { get; set; } = "cover";
     [Description("Darken the picture (0 = not at all, 1 = black)."), Range(0, 1)]
     public float Dim { get; set; }
+
+    [DisplayName("Pattern"), Description("A pattern drawn over the whole backdrop (smooth themes): dots, lines, a grid… none = no pattern."), Choices("none", "scanlines", "grid", "dots", "crosses", "diagonal", "crosshatch", "vlines"), TypeConverter(typeof(ChoicesConverter))]
+    public string Pattern { get; set; } = "none";
+    [DisplayName("Pattern colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string PatternColor { get; set; } = "line";
+    [DisplayName("Pattern opacity"), Range(0, 1)] public float PatternOpacity { get; set; } = 0.5f;
+    [DisplayName("Pattern spacing"), Description("Pixels between the pattern's lines or dots."), Range(2, 400)] public float PatternSpacing { get; set; } = 24;
+    [DisplayName("Pattern size"), Description("Thickness of the lines or dots, in pixels."), Range(0.5, 50)] public float PatternSize { get; set; } = 2;
+    [DisplayName("Pattern 2"), Description("A second pattern on top of the first (e.g. faint scanlines over dots). none = no second pattern."), Choices("none", "scanlines", "grid", "dots", "crosses", "diagonal", "crosshatch", "vlines"), TypeConverter(typeof(ChoicesConverter))]
+    public string Pattern2 { get; set; } = "none";
+    [DisplayName("Pattern 2 colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string Pattern2Color { get; set; } = "line";
+    [DisplayName("Pattern 2 opacity"), Range(0, 1)] public float Pattern2Opacity { get; set; } = 0.15f;
+    [DisplayName("Pattern 2 spacing"), Range(2, 400)] public float Pattern2Spacing { get; set; } = 3;
+    [DisplayName("Pattern 2 size"), Range(0.5, 50)] public float Pattern2Size { get; set; } = 1;
 }
 
 internal sealed class InteractionOptions

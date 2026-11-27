@@ -13,6 +13,7 @@ internal sealed class Preview : IDisposable
         public int W, H;
         public RectangleF Area;
         public List<(int fileIndex, RectangleF r, string label)> Widgets = new();
+        public List<(int fileIndex, Glyph.Widgets.Part part)> Parts = new();
         public bool BarOn;
         public RectangleF BarRect;
         public List<(BarModuleOptions m, RectangleF r)> Modules = new();
@@ -20,7 +21,7 @@ internal sealed class Preview : IDisposable
     }
 
     readonly Thread thread;
-    volatile bool stop, reload = true, dirty = true;
+    volatile bool stop, reload = true, dirty = true, replay;
     volatile string theme = "";
     public volatile bool Animate;
     PointF mouse = new(-1e6f, -1e6f);
@@ -41,11 +42,13 @@ internal sealed class Preview : IDisposable
     public string Theme { get => theme; set { theme = value; Reload(); } }
     public void Reload() { reload = true; wake.Set(); }
     public void Redraw() { dirty = true; wake.Set(); }
+    /// Plays the theme's appear / loop animations again.
+    public void Replay() { replay = true; dirty = true; wake.Set(); }
     public void SetMouse(PointF p) { lock (gate) mouse = p; if (Animate) wake.Set(); }
 
     static RectangleF TaskbarCut(Rectangle screen)
     {
-        var tb = Native.FindWindow("Shell_TrayWnd", null);
+        var tb = Glyph.Data.Tray.ExplorerTray();
         if (tb == IntPtr.Zero || !Native.IsWindowVisible(tb) || !Native.GetWindowRect(tb, out var r)) return RectangleF.Empty;
         var rr = Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom);
         rr.Intersect(screen);
@@ -79,7 +82,8 @@ internal sealed class Preview : IDisposable
                     desk.Canvas.Reset(); barR?.Canvas.Reset();
                     dirty = true;
                 }
-                bool loading = comp.Widgets.Any(w => w.Animated);   // e.g. shortcut icons still coming in
+                if (replay) { replay = false; comp.ReplayAnimations(); }
+                bool loading = comp.Widgets.Any(w => w.Animated) || comp.Anim.Running;   // e.g. shortcut icons still coming in, tweens playing
                 if (!dirty && !loading && !Animate) { wake.WaitOne(500); continue; }
                 dirty = false;
 
@@ -107,13 +111,18 @@ internal sealed class Preview : IDisposable
                 PointF m; lock (gate) m = Animate ? mouse : new PointF(-1e6f, -1e6f);
                 var atlas = desk.Atlas!;
                 comp.Env.Canvas = desk.Canvas;
+                comp.UpdateHover(m.X, m.Y, m.X > -1e5f);   // hover looks and hover tweens (only with Animate on)
                 comp.Compose(W, H, atlas.CellW, atlas.CellH, (float)time, dt, m.X, m.Y, area);
                 desk.Draw(comp.Grid, comp.Effects, (float)time, comp.ClearColor, comp.HasBackdrop ? comp.DrawBackdrop : null, comp.HasVectorLayer ? comp.DrawWidgets : null);
                 var target = buffers[which];
                 which ^= 1;
                 lock (target) desk.ReadBackInto(target);
                 foreach (var w in comp.Widgets)
-                    if (!w.Bounds.IsEmpty) info.Widgets.Add((w.FileIndex, w.Bounds, w.GetType().Name.Replace("Widget", "").ToLowerInvariant()));
+                {
+                    if (w.Bounds.IsEmpty) continue;
+                    info.Widgets.Add((w.FileIndex, w.Bounds, w.GetType().Name.Replace("Widget", "").ToLowerInvariant()));
+                    try { foreach (var pt in w.Parts()) if (!pt.Rect.IsEmpty) info.Parts.Add((w.FileIndex, pt)); } catch { }
+                }
 
                 if (info.BarOn)
                 {
@@ -138,7 +147,8 @@ internal sealed class Preview : IDisposable
                     foreach (var (mo, r) in bar.ModuleRects()) info.Modules.Add((mo, new RectangleF(r.X + info.BarRect.X, r.Y + info.BarRect.Y, r.Width, r.Height)));
                 }
                 Frame?.Invoke(target, info);
-                if (Animate) Thread.Sleep(60); else if (loading) Thread.Sleep(120);   // playing videos: a lighter preview
+                if (comp.Anim.Running) Thread.Sleep(30);   // tweens: smooth enough to judge them
+                else if (Animate) Thread.Sleep(60); else if (loading) Thread.Sleep(120);   // playing videos: a lighter preview
             }
         }
         catch (Exception e) { Log.Write("preview: " + e); }

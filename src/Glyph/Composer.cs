@@ -23,6 +23,9 @@ internal sealed class Composer : IDisposable
     public float Scale = 1;
     float VS => Theme.Smooth ? Scale : 1;
     public int Generation;          // bumps on every load (so caches know to refresh)
+    /// The theme's tweens (animations.toml), played on the widgets.
+    public readonly Animator Anim = new();
+    readonly HashSet<Widget> over = new();   // widgets the mouse is over (for hover tweens)
 
     public FontOptions Font => Theme.Options.Font;
     public EffectSettings Effects => Theme.Options.Effects;
@@ -40,11 +43,16 @@ internal sealed class Composer : IDisposable
             if (first != null) app.Theme = first;
         }
         var theme = Theme.Load(app.Theme, problems);
+        Glyph.Render.Fonts.Refresh();   // font files added to or taken out of config\fonts
+        var ui = theme.Options.Ui;
+        Glyph.Render.Symbols.Style = ui.IconStyle; Glyph.Render.Symbols.Fill = ui.IconFill; Glyph.Render.Symbols.Scale = ui.IconSize;
+        Glyph.Render.Symbols.EnsureStyle(ui.IconStyle);
         Glyph.Data.Variables.Use(Glyph.Data.Variables.LoadList(theme.Name, problems));
         var scene = WallpaperScene.Load(theme, problems);
         var shortcuts = ShortcutStore.Load(problems);
         var widgets = new List<Widget>();
         var wlist = withWidgets ? WidgetsFile.Load(theme, problems).Widgets : new List<WidgetOptions>();
+        var tweens = withWidgets ? AnimationsFile.Load(theme, problems).Tweens : new List<TweenOptions>();
         for (int k = 0; k < wlist.Count; k++)
         {
             var o = wlist[k];
@@ -58,6 +66,8 @@ internal sealed class Composer : IDisposable
         Widgets.Clear();
         App = app; Theme = theme; Scene = scene; Problems = problems;
         Widgets.AddRange(widgets);
+        over.Clear();
+        Anim.Bind(tweens, Widgets);
         Env.Painter.Reset();
         Env.Theme = theme;
         Generation++;
@@ -66,7 +76,10 @@ internal sealed class Composer : IDisposable
     }
 
     /// True while something on screen moves by itself (so frames must keep coming).
-    public bool Animated => Scene.Animated || Widgets.Any(w => w.Animated) || ripples.Count > 0 || trail.Count > 0;
+    public bool Animated => Scene.Animated || Widgets.Any(w => w.Animated) || ripples.Count > 0 || trail.Count > 0 || (Theme.Smooth && Anim.Running);
+
+    /// Plays the appear and loop animations again from the start (the editor's Play button).
+    public void ReplayAnimations() => Anim.Restart();
 
     // ---------------- background interaction: ripples, trail, actions ----------------
 
@@ -88,7 +101,7 @@ internal sealed class Composer : IDisposable
     public void Wheel(float x, float y, int delta)
     {
         x /= VS; y /= VS;
-        foreach (var w in Widgets) if (w.Bounds.Contains(x, y)) { w.Wheel(x, y, delta, Env); return; }
+        foreach (var w in Widgets) if (w.Covers(x, y)) { w.Wheel(x, y, delta, Env); return; }
         var a = delta > 0 ? I.OnScrollUp : I.OnScrollDown;
         if (a.Length > 0) BackgroundAction?.Invoke(a);
     }
@@ -164,11 +177,22 @@ internal sealed class Composer : IDisposable
         Env.W = (int)(pxW / vs); Env.H = (int)(pxH / vs); Env.CellW = cellW; Env.CellH = cellH; Env.Theme = Theme; Env.Time = time;
         SetupPainter(cellW, cellH);
         lastTime = time;
+        Anim.Step(time, dt, w => over.Contains(w));
         Scene.Draw(frame);
         DrawInteractionCells();
-        foreach (var w in Widgets) { w.Layout(Env); w.DrawCells(Grid, Env); }
+        foreach (var w in Widgets) { UseFont(w); w.Layout(Env); w.DrawCells(Grid, Env); }
+        UseFont(null);
         DrawSelectionCells();
         DrawProblems();
+    }
+
+    /// A box's own font and size (Box > Font / Font size), or the theme's for null.
+    void UseFont(Widget? w)
+    {
+        var ui = Theme.Options.Ui;
+        var o = w?.Opt;
+        Env.Painter.Font = o != null && o.Font.Length > 0 ? o.Font : ui.Font;
+        Env.BaseFontSize = Env.Painter.FontSize = o != null && o.FontSize > 0 ? o.FontSize : ui.FontSize;
     }
 
     void SetupPainter(int cellW, int cellH)
@@ -205,17 +229,36 @@ internal sealed class Composer : IDisposable
         var area = new RectangleF(0, 0, Env.W, Env.H);
         if (b.Type == "gradient") c.Gradient(area, b.Colors.Select(n => Theme[n]).ToList(), b.Angle, b.Shape == "radial");
         else if (b.Type == "image" && b.File.Length > 0) c.Picture(Paths.FindAsset(b.File, Theme.Name, "images"), area, b.Fit, b.Dim);
+        if (!Theme.Smooth) return;
+        Patterns.Fill(c, area, b.Pattern, Theme[b.PatternColor], b.PatternOpacity, b.PatternSpacing, b.PatternSize);
+        Patterns.Fill(c, area, b.Pattern2, Theme[b.Pattern2Color], b.Pattern2Opacity, b.Pattern2Spacing, b.Pattern2Size);
     }
 
-    public bool HasBackdrop => Scene.Options.Backdrop.Type is "gradient" || (Scene.Options.Backdrop.Type == "image" && Scene.Options.Backdrop.File.Length > 0);
+    public bool HasBackdrop
+    {
+        get
+        {
+            var b = Scene.Options.Backdrop;
+            return b.Type is "gradient" || (b.Type == "image" && b.File.Length > 0) || (Theme.Smooth && (b.Pattern != "none" || b.Pattern2 != "none"));
+        }
+    }
 
     public void DrawWidgets(Canvas c)
     {
         DrawInteractionVector(c);
         if (Theme.Smooth) DrawLinks(c);
-        foreach (var w in Widgets) w.DrawVector(c, Env);
-        DrawSelectionVector(c);
+        foreach (var w in Widgets) { UseFont(w); var ww = w; Anim.Apply(c, w, () => ww.DrawVector(c, Env)); }
+        UseFont(null);
+        if (!SelectionApart) DrawSelectionVector(c);
     }
+
+    /// The engine draws the smooth selection box by itself (over a kept frame) instead of with the widgets.
+    public bool SelectionApart { get; set; }
+
+    /// Smooth themes: the box can be drawn on its own, many times a second, over a kept picture of the desktop.
+    public bool SmoothSelecting => selecting && Theme.Smooth;
+
+    public void DrawSelection(Canvas c) => DrawSelectionVector(c);
 
     /// Lines from a panel to the panel named in its Link to (drawn under the panels).
     void DrawLinks(Canvas c)
@@ -286,10 +329,16 @@ internal sealed class Composer : IDisposable
     {
         x /= VS; y /= VS;
         bool changed = false;
+        bool hoverTweens = Anim.HasHover;
         foreach (var w in Widgets)
         {
             int h = overDesktop ? w.HitTest(x, y) : -1;
             if (h != w.Hover) { w.Hover = h; changed = true; }
+            if (hoverTweens)
+            {
+                bool on = overDesktop && w.Covers(x, y);
+                if (on ? over.Add(w) : over.Remove(w)) changed = true;
+            }
         }
         return changed;
     }
@@ -298,7 +347,7 @@ internal sealed class Composer : IDisposable
     {
         x /= VS; y /= VS;
         downWidget = null; downItem = -1;
-        bgDown = Widgets.Any(w => w.Bounds.Contains(x, y)) ? new PointF(-1e6f, -1e6f) : new PointF(x, y);
+        bgDown = Widgets.Any(w => w.Covers(x, y)) ? new PointF(-1e6f, -1e6f) : new PointF(x, y);
         selFrom = bgDown.X > -1e5f && I.SelectBox && App.HideDesktopIcons ? bgDown : null;
         selecting = false;
         foreach (var w in Widgets)
@@ -374,6 +423,7 @@ internal sealed class Composer : IDisposable
         bool dbl = lastWidget == downWidget && lastItem == h && now - lastClickMs <= SystemInformation.DoubleClickTime
                    && Math.Abs(x - lastClickPt.X) <= SystemInformation.DoubleClickSize.Width && Math.Abs(y - lastClickPt.Y) <= SystemInformation.DoubleClickSize.Height;
         Log.D($"click on item {h} ({(dbl ? "double" : "single")})");
+        Anim.Clicked(downWidget);
         downWidget.Click(h, dbl ? 2 : 1, Env);
         if (dbl) { lastWidget = null; lastItem = -1; }
         else { lastWidget = downWidget; lastItem = h; lastClickMs = now; lastClickPt = new PointF(x, y); }

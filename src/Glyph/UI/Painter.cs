@@ -15,6 +15,8 @@ internal sealed class Painter
     public Canvas? Canvas;              // for measuring text in the smooth style
     public string Font = "Segoe UI", MonoFont = "Cascadia Mono";
     public float FontSize = 13;
+    public string HoverColor = "accent";   // highlight under the mouse on clickable text
+    Rgba? textOverride;                     // text colour inside a framed box under the mouse (its frame's Hover text)
 
     readonly Dictionary<string, (int[] ch, uint[] fg)> asciiCache = new();
     readonly Dictionary<string, (byte[] px, int w, int h)> pixelCache = new();
@@ -46,7 +48,8 @@ internal sealed class Painter
                 {
                     float size = FontSize * b.Scale;
                     var font = b.Font.Length > 0 ? b.Font : Font;
-                    return (Canvas?.Measure(b.Text, font, size, false) ?? b.Text.Length * size * 0.6f, size * 1.2f);
+                    float bw = Canvas == null ? b.Text.Length * size * 0.6f : Glyph.Render.FramePainter.MeasureText(Canvas, b.Text, font, size, false, b.Spacing);
+                    return (bw, size * 1.2f);
                 }
             case MeterEl m:
                 if (Terminal) return (m.Label.Length + m.ValueText.Length + (m.Cells > 0 ? m.Cells : 10) + 2, 1);
@@ -185,7 +188,7 @@ internal sealed class Painter
                         g.FillRect(sx, y, len, 1, t.Hot ? Px2(pill, 1.35f) : pill.Packed);
                         sx++;
                     }
-                    else if (t.Hot) g.FillRect(sx, y, len, 1, Theme["accent"].WithAlpha(0.25f).Packed);
+                    else if (t.Hot) g.FillRect(sx, y, len, 1, Theme[HoverColor].WithAlpha(0.25f).Packed);
                     foreach (var s in t.Spans) { g.Text(sx, y, s.Text, s.Color.Packed); sx += s.Text.Length; }
                     break;
                 }
@@ -322,15 +325,26 @@ internal sealed class Painter
                         c.Fill(new RectangleF(sx, y + h * 0.08f, tw, h * 0.84f), t.Hot ? Lighter(pill) : pill, radius);
                         sx += FontSize * 0.6f;
                     }
-                    else if (t.Hot) c.Fill(new RectangleF(sx - 4, y, tw + 8, h), Theme["accent"], radius, 0.18f);
+                    else if (t.Hot) c.Fill(new RectangleF(sx - 4, y, tw + 8, h), Theme[HoverColor], radius, 0.18f);
                     float size = Px(t.Size);
                     var font = t.Mono ? MonoFont : Font;
                     bool bold = t.Bold || t.Size == TextSize.Title;
+                    if (t.Shadow is Rgba sh)
+                    {
+                        float shx = sx;
+                        foreach (var s in t.Spans)
+                        {
+                            float sw = Glyph.Render.FramePainter.MeasureText(Canvas!, s.Text, font, size, bold, t.Spacing);
+                            Glyph.Render.FramePainter.DrawText(c, s.Text, shx + t.ShadowX, y + (h - size * 1.36f) / 2 + t.ShadowY, size * 1.36f, sh, font, size, bold, t.Spacing);
+                            shx += sw;
+                        }
+                    }
                     foreach (var s in t.Spans)
                     {
                         float sw = Glyph.Render.FramePainter.MeasureText(Canvas!, s.Text, font, size, bold, t.Spacing);
-                        if (t.Spacing != 0) Glyph.Render.FramePainter.DrawText(c, s.Text, sx, y + (h - size * 1.36f) / 2, size * 1.36f, s.Color, font, size, bold, t.Spacing);
-                        else c.Text(s.Text, new RectangleF(sx, y + (h - size * 1.36f) / 2, sw + 4, size * 1.5f), s.Color, font, size, bold);
+                        var sc = textOverride ?? s.Color;
+                        if (t.Spacing != 0) Glyph.Render.FramePainter.DrawText(c, s.Text, sx, y + (h - size * 1.36f) / 2, size * 1.36f, sc, font, size, bold, t.Spacing);
+                        else c.Text(s.Text, new RectangleF(sx, y + (h - size * 1.36f) / 2, sw + 4, size * 1.5f), sc, font, size, bold);
                         sx += sw;
                     }
                     break;
@@ -339,6 +353,15 @@ internal sealed class Painter
                 {
                     float size = FontSize * b.Scale;
                     var font = b.Font.Length > 0 ? b.Font : Font;
+                    if (Math.Abs(b.Spacing) >= 0.01f)
+                    {
+                        float bw = Glyph.Render.FramePainter.MeasureText(c, b.Text, font, size, false, b.Spacing);
+                        float bx = b.Align == "right" ? x + w - bw : b.Align == "center" ? x + (w - bw) / 2 : x;
+                        float lh = size * 1.36f;
+                        if (b.HasShadow) Glyph.Render.FramePainter.DrawText(c, b.Text, bx + 2, y + 3, lh, b.Shadow, font, size, false, b.Spacing);
+                        Glyph.Render.FramePainter.DrawText(c, b.Text, bx, y, lh, b.Color, font, size, false, b.Spacing);
+                        break;
+                    }
                     if (b.HasShadow) c.Text(b.Text, new RectangleF(x + 2, y + 3, w, h), b.Shadow, font, size, false, b.Align);
                     c.Text(b.Text, new RectangleF(x, y, w, h), b.Color, font, size, false, b.Align);
                     break;
@@ -412,7 +435,8 @@ internal sealed class Painter
                 {
                     var r = new RectangleF(x, y + 1, w, h - 2);
                     Glyph.Render.FramePainter.Draw(c, k.Frame, Theme, r, "", "", FontSize, k.Hot);
-                    c.Text(k.Label, new RectangleF(x, y + (h - LineH()) / 2, w, LineH()), k.Hot && k.Frame.HoverFill == "none" ? k.Hover : k.Color, Font, FontSize, false, "center");
+                    var kc = k.Hot && k.Frame.HoverText != "none" ? Theme[k.Frame.HoverText] : k.Hot && k.Frame.HoverFill == "none" ? k.Hover : k.Frame.TextColor != "none" ? Theme[k.Frame.TextColor] : k.Color;
+                    c.Text(k.Label, new RectangleF(x, y + (h - LineH()) / 2, w, LineH()), kc, Font, FontSize, false, "center");
                     break;
                 }
             case ButtonEl k:
@@ -459,7 +483,14 @@ internal sealed class Painter
                     break;
                 }
         }
+        var saved = textOverride;
+        if (e is BoxEl hb && hb.Frame != null)
+        {
+            if (hb.Hot && hb.Frame.HoverText != "none") textOverride = Theme[hb.Frame.HoverText];
+            else if (hb.Frame.TextColor != "none") textOverride = Theme[hb.Frame.TextColor];
+        }
         foreach (var k in e.Children) PaintVector(k, c, ox, oy, bg, radius);
+        textOverride = saved;
     }
 
     /// A meter's bar: one rounded bar, or separate blocks when it has segments.

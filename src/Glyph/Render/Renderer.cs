@@ -61,6 +61,7 @@ internal sealed class Renderer : IDisposable
     Target? scene, bloomA, bloomB;
     ID2D1Bitmap1? sceneBitmap;
     ID2D1Bitmap1? outBitmap;   // D2D view of the window's own buffer (drawing straight into it when there are no effects)
+    ID3D11Texture2D? still;    // a copy of the last finished frame, while something small (the selection box) is drawn over it
 
     public GlyphAtlas? Atlas { get; private set; }
     public Canvas Canvas { get; }
@@ -91,6 +92,8 @@ internal sealed class Renderer : IDisposable
             Dxgi = DXGI.CreateDXGIFactory1<IDXGIFactory2>();
             D2d = D2D1.D2D1CreateFactory<ID2D1Factory1>(Vortice.Direct2D1.FactoryType.SingleThreaded);
             using (var dxgiDevice = Device.QueryInterface<IDXGIDevice>()) D2dDevice = D2d.CreateDevice(dxgiDevice);
+            // at most one frame waiting to be shown: what's drawn follows the mouse a frame behind instead of three
+            try { using var d1 = Device.QueryInterface<IDXGIDevice1>(); d1.SetMaximumFrameLatency(1); } catch { }
             Dc = D2dDevice.CreateDeviceContext(DeviceContextOptions.None);
             Dw = Vortice.DirectWrite.DWrite.DWriteCreateFactory<IDWriteFactory>(Vortice.DirectWrite.FactoryType.Shared);
             Vs = Device.CreateVertexShader(Compile("VS", "vs_5_0"));
@@ -121,6 +124,7 @@ internal sealed class Renderer : IDisposable
             Ctx.ClearState();
             Over.Dispose(); GridCb.Dispose(); PostCb.Dispose(); Linear.Dispose(); Point.Dispose();
             Vs.Dispose(); PsGrid.Dispose(); PsBright.Dispose(); PsBlur.Dispose(); PsComposite.Dispose(); PsCopy.Dispose();
+            Fonts.Forget(Dw);
             Dc.Dispose(); D2dDevice.Dispose(); Dw.Dispose(); D2d.Dispose(); Dxgi.Dispose();
             Ctx.Dispose(); Device.Dispose();
         }
@@ -206,6 +210,7 @@ internal sealed class Renderer : IDisposable
         w = Math.Max(1, w); h = Math.Max(1, h);
         if (w == Width && h == Height) return;
         DropScene();
+        DropStill();
         DropOut();
         if (swap != null)
         {
@@ -236,8 +241,45 @@ internal sealed class Renderer : IDisposable
     public void Trim()
     {
         DropScene();
+        DropStill();
         Canvas.Reset();
         ctx.Flush();
+    }
+
+    /// Keeps a copy of the frame just drawn (call before Present), for DrawOver(fromStill: true).
+    public void KeepStill()
+    {
+        using var cur = swap != null ? swap.GetBuffer<ID3D11Texture2D>(0) : offscreen!.QueryInterface<ID3D11Texture2D>();
+        if (still == null)
+        {
+            var d = cur.Description;
+            still = Device.CreateTexture2D(new Texture2DDescription
+            {
+                Width = d.Width, Height = d.Height, MipLevels = 1, ArraySize = 1, Format = d.Format,
+                SampleDescription = new SampleDescription(1, 0), Usage = ResourceUsage.Default, BindFlags = BindFlags.None,
+            });
+        }
+        ctx.CopyResource(still, cur);
+    }
+
+    public bool HasStill => still != null;
+
+    public void DropStill() { still?.Dispose(); still = null; }
+
+    /// Draws smooth shapes straight onto the window's buffer: over the frame just drawn, or (fromStill)
+    /// over a fresh copy of the kept frame. Much cheaper than a whole frame.
+    public void DrawOver(Action<Canvas> draw, bool fromStill)
+    {
+        using var cur = swap != null ? swap.GetBuffer<ID3D11Texture2D>(0) : offscreen!.QueryInterface<ID3D11Texture2D>();
+        if (fromStill && still != null) ctx.CopyResource(cur, still);
+        if (outBitmap == null)
+        {
+            using var surface = cur.QueryInterface<IDXGISurface>();
+            outBitmap = dc.CreateBitmapFromDxgiSurface(surface, new BitmapProperties1(
+                new Vortice.DCommon.PixelFormat(Format.B8G8R8A8_UNorm, Vortice.DCommon.AlphaMode.Premultiplied), 96, 96,
+                BitmapOptions.Target | BitmapOptions.CannotDraw));
+        }
+        D2D(draw, outBitmap);
     }
 
     void DropScene()
@@ -497,6 +539,7 @@ internal sealed class Renderer : IDisposable
         ctx.OMSetRenderTargets((ID3D11RenderTargetView)null!);
         DropScene();
         DropOut();
+        DropStill();
         cellsSrv?.Dispose(); cellsTex?.Dispose();
         Atlas?.Dispose();
         Canvas.Dispose();

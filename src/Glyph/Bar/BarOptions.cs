@@ -16,6 +16,7 @@ internal sealed class BarFile
     {
         ["text"] = () => new TextModule(), ["meter"] = () => new MeterModule(), ["graph"] = () => new GraphModule(),
         ["workspaces"] = () => new WorkspacesModule(), ["spacer"] = () => new SpacerModule(), ["icons"] = () => new IconsModule(),
+        ["tasks"] = () => new TasksModule(), ["tray"] = () => new TrayModule(),
     };
 
     /// Ready-made modules for the settings window's "Add module" menu.
@@ -28,6 +29,12 @@ internal sealed class BarFile
         ("Tiling (click: next layout, right-click: on/off)", () => new TextModule { Format = "[accent]tile[/] {tiling}", Color = "dim", OnClick = "tile:layout:next", OnRightClick = "tile:toggle" }),
         ("Launcher button", () => new TextModule { Format = "⌕", Color = "accent", OnClick = "launcher" }),
         ("App icons (a shortcuts group)", () => new IconsModule()),
+        ("Open windows (like the taskbar)", () => new TasksModule()),
+        ("Tray icons (notification area)", () => new TrayModule()),
+        ("Start menu button", () => new TextModule { Format = "{icon:apps}", OnClick = "keys:win", OnRightClick = "keys:win+x" }),
+        ("Notifications and calendar", () => new TextModule { Format = "{icon:notifications}", OnClick = "keys:win+n" }),
+        ("Quick settings (Wi-Fi, sound…)", () => new TextModule { Format = "{icon:tune}", OnClick = "keys:win+a" }),
+        ("Show desktop", () => new TextModule { Format = "{icon:desktop_windows}", OnClick = "keys:win+d" }),
         ("Wi-Fi", () => new TextModule { Format = "[dim]net[/] {wifi_signal|bar:4:▮▯} {wifi|default:{network}}", OnClick = "ms-settings:network-wifi" }),
         ("Bluetooth", () => new TextModule { Format = "[dim]bt[/] {bluetooth|upper|default:--}", OnClick = "ms-settings:bluetooth" }),
         ("Keyboard language", () => new TextModule { Format = "[dim]lng[/] {lang}", OnClick = "keys:win+space" }),
@@ -114,6 +121,7 @@ internal sealed class BarOptions
     [Category("Modules"), DisplayName("Module padding"), Description("Space inside a module frame, left and right, in pixels."), Range(0, 100)] public float ModulePadding { get; set; } = 8;
     [Category("Modules"), DisplayName("Module inset"), Description("Space between a module frame and the top and bottom of the bar, in pixels."), Range(0, 100)] public float ModuleInset { get; set; } = 3;
     [Category("Modules"), DisplayName("Joined gap"), Description("Space between modules that share a frame (Join), in pixels."), Range(0, 100)] public float JoinGap { get; set; } = 8;
+    [Category("Modules"), DisplayName("Hover colour"), Description("The highlight under the mouse on modules that do something on click (without a frame)."), Color, TypeConverter(typeof(ColorNameConverter))] public string HoverColor { get; set; } = "accent";
 }
 
 // ---------------- modules ----------------
@@ -127,6 +135,10 @@ internal abstract class BarModuleOptions
     [Category("Module"), Description("Bold text (smooth style).")] public bool Bold { get; set; }
     [Category("Module"), Description("A frame around this module. auto = the bar's Module frame, none = no frame. Smooth style."), TypeConverter(typeof(FrameNameConverter))] public string Frame { get; set; } = "auto";
     [Category("Module"), Description("Share one frame with the next module (e.g. a label, a meter and a number in one box).")] public bool Join { get; set; }
+    [Category("Module"), Description("A small label above the module (e.g. APPS), with {values}. Empty = none. Smooth style.")] public string Caption { get; set; } = "";
+    [Category("Module"), DisplayName("Caption colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string CaptionColor { get; set; } = "dim";
+    [Category("Module"), DisplayName("Caption spacing"), Description("Extra pixels between the caption's letters."), Range(-5, 50)] public float CaptionSpacing { get; set; } = 2;
+    [Category("Module"), DisplayName("Caption below"), Description("Put the caption under the module instead of above it.")] public bool CaptionBelow { get; set; }
     [Category("Clicks"), DisplayName("On click"), Description(Glyph.Data.Actions.Help)] public string OnClick { get; set; } = "";
     [Category("Clicks"), DisplayName("On right-click")] public string OnRightClick { get; set; } = "";
     [Category("Clicks"), DisplayName("On scroll up")] public string OnScrollUp { get; set; } = "";
@@ -193,6 +205,39 @@ internal sealed class IconsModule : BarModuleOptions
     [Category("Icons"), DisplayName("Icon style"), Description("original = the app's own icon, tint = recoloured, mono = a flat silhouette in the module's colour."), Choices("original", "tint", "mono"), TypeConverter(typeof(ChoicesConverter))] public string Style { get; set; } = "original";
     [Category("Icons"), Description("Space between icons, in pixels."), Range(0, 100)] public float Spacing { get; set; } = 6;
     public override string ToString() => $"icons: {(Group.Length > 0 ? Group : "all shortcuts")}";
+}
+
+internal sealed class TasksModule : BarModuleOptions
+{
+    public override string Type => "tasks";
+    [Category("Tasks"), Description("What each window shows: {title} = the window's title, {app} = the program's name. Empty = just the icon.")] public string Format { get; set; } = "{app}";
+    [Category("Tasks"), DisplayName("Max length"), Description("Cut longer text with … (0 = no limit)."), Range(0, 200)] public int MaxLength { get; set; } = 18;
+    [Category("Tasks"), DisplayName("Show icons")] public bool Icons { get; set; } = true;
+    [Category("Tasks"), DisplayName("Icon size"), Description("In pixels. 0 = a bit bigger than the text."), Range(0, 128)] public float IconSize { get; set; }
+    [Category("Tasks"), DisplayName("Icon style"), Description("original = the program's own icon, mono = a flat silhouette in the module's colour."), Choices("original", "tint", "mono"), TypeConverter(typeof(ChoicesConverter))] public string Style { get; set; } = "original";
+    [Category("Tasks"), DisplayName("Task frame"), Description("A frame around each window's button. none = no frame."), TypeConverter(typeof(FrameNameConverter))] public string TaskFrame { get; set; } = "none";
+    [Category("Tasks"), DisplayName("Active frame"), Description("A frame for the window in front. none = the same as Task frame."), TypeConverter(typeof(FrameNameConverter))] public string ActiveFrame { get; set; } = "none";
+    [Category("Tasks"), DisplayName("Active colour"), Description("Text colour of the window in front."), Color, TypeConverter(typeof(ColorNameConverter))] public string ActiveColor { get; set; } = "auto";
+    [Category("Tasks"), DisplayName("Minimised colour"), Description("Text colour of minimised windows."), Color, TypeConverter(typeof(ColorNameConverter))] public string MinimisedColor { get; set; } = "dim";
+    [Category("Tasks"), DisplayName("Most shown"), Description("Show at most this many windows."), Range(1, 60)] public int MaxCount { get; set; } = 12;
+    [Category("Tasks"), Description("Space between windows, in pixels."), Range(0, 100)] public float Spacing { get; set; } = 6;
+    [Category("Tasks"), DisplayName("Group by program"), Description("One button per program instead of per window ({count} = how many windows). Clicking it again brings its next window to the front.")] public bool Combine { get; set; }
+    [Category("Tasks"), DisplayName("Right-click"), Description("What right-clicking a window's button does."), Choices("none", "close", "minimise", "maximise"), TypeConverter(typeof(ChoicesConverter))] public string RightClick { get; set; } = "none";
+    [Category("Tasks"), DisplayName("Leave out"), Description("Programs not to show: parts of their names (e.g. Settings)."), TypeConverter(typeof(ListConverter))] public string[] Hide { get; set; } = Array.Empty<string>();
+    public override string ToString() => "tasks";
+}
+
+internal sealed class TrayModule : BarModuleOptions
+{
+    public override string Type => "tray";
+    [Category("Tray"), DisplayName("Icon size"), Description("In pixels. 0 = a bit bigger than the text."), Range(0, 128)] public float IconSize { get; set; }
+    [Category("Tray"), DisplayName("Icon style"), Description("original = the programs' own icons, tint = recoloured, mono = flat silhouettes in the module's colour."), Choices("original", "tint", "mono"), TypeConverter(typeof(ChoicesConverter))] public string Style { get; set; } = "original";
+    [Category("Tray"), Description("Space between icons, in pixels."), Range(0, 100)] public float Spacing { get; set; } = 6;
+    [Category("Tray"), DisplayName("Icon frame"), Description("A frame around each icon. none = no frame."), TypeConverter(typeof(FrameNameConverter))] public string IconFrame { get; set; } = "none";
+    [Category("Tray"), DisplayName("Leave out"), Description("Icons not to show: parts of their program's name or tooltip (e.g. OneDrive)."), TypeConverter(typeof(ListConverter))] public string[] Hide { get; set; } = Array.Empty<string>();
+    [Category("Tray"), DisplayName("Most shown"), Range(1, 60)] public int MaxCount { get; set; } = 16;
+    [Category("Tray"), DisplayName("Show hidden"), Description("Also show icons their programs asked to hide.")] public bool ShowHidden { get; set; }
+    public override string ToString() => "tray";
 }
 
 internal sealed class SpacerModule : BarModuleOptions

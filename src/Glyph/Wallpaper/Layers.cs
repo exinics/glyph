@@ -90,6 +90,7 @@ internal sealed class NoiseLayer : Layer
     public override void Draw(Frame f)
     {
         var g = f.Grid;
+        float interval = Perf.NoiseInterval(this.interval, f.Dt);
         aspect = f.Aspect;
         if (!primed || g.W != gw || g.H != gh)
         {

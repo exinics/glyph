@@ -8,16 +8,27 @@ a settings window, and a video→ASCII converter.
 
 ## Install
 
-1. `winget install Microsoft.DotNet.DesktopRuntime.9` (and `winget install Gyan.FFmpeg.Essentials` for videos).
-2. Download `Glyph-win-x64.zip` from [Releases](https://github.com/exinics/glyph/releases), unzip, run `Glyph\bin\Glyph.exe`.
+1. Download `Glyph-Setup-x.y.z.exe` from [Releases](https://github.com/exinics/glyph/releases) and run it: pick the
+   folder (default `%LOCALAPPDATA%\Programs\Glyph`, no administrator needed), Start menu shortcuts (Glyph, Glyph
+   settings, Glyph video converter), optional desktop shortcut, "start when I sign in". It fetches the .NET 9 Desktop
+   Runtime if the PC hasn't got it, and offers to copy settings from a Glyph used before (registry `HKCU\Software\Glyph`
+   `Home`). Uninstall from Windows' Apps list: `config\` (your settings) is kept.
+   Or: the zip `Glyph-win-x64.zip` (unzip, run `Glyph\bin\Glyph.exe`; needs `winget install Microsoft.DotNet.DesktopRuntime.9`).
+2. For videos: `winget install Gyan.FFmpeg.Essentials`.
 3. It updates itself from the newest release (Settings > General > Updates).
+4. Start with Windows is a Task Scheduler task "Glyph" (runs `Glyph.exe --autostart` at sign-in, straight away; the
+   Run key, which Windows holds back for 30 s to 2 min behind other startup programs, is only the fallback).
 
 ## Building and releasing
 
 - `powershell -File build.ps1` builds into `bin\` (and restarts Glyph if it was running).
 - `powershell -File release.ps1 [-Version 1.2.0] [-Notes "..."]` bumps the version in `Glyph.csproj`, builds
   `out\Glyph-win-x64.zip` (`Glyph\bin\` with `themes\` inside, plus an empty `Glyph\config\`), commits, tags,
-  pushes and creates the GitHub release every Glyph updates from (`Updater.cs`).
+  pushes and creates the GitHub release every Glyph updates from (`Updater.cs`). It also builds the installer
+  `out\Glyph-Setup-<version>.exe` from `installer\Glyph.iss` (Inno Setup 6.5+: `winget install JRSoftware.InnoSetup`)
+  and attaches it. `-LocalOnly` builds `out\` and the installer without bumping, committing or publishing.
+- `build.ps1` only restarts this folder's Glyph; while an installed Glyph exists it restarts it with `GLYPH_DEV=1`
+  (then it doesn't take over start with Windows).
 - `themes\` holds the theme that ships with Glyph (operator). The build puts it in `bin\themes`; it's copied into
   `config\themes` only when there are no themes yet (first run). Updates never touch themes.
   `config\` itself is personal and not in git (only `config\GUIDE.md` is).
@@ -47,6 +58,26 @@ Glyph\
 - Updates: `Updater.cs` checks GitHub's latest release, unzips it into `logs\update`, starts the new exe with
   `--finish-update <bin> <pid>` (waits for Glyph to close, copies itself over `bin\`, restarts it). `--update [--no-start]`
   does the same from a terminal.
+- Installer helpers: `--quit` (asks the running Glyph to quit and waits), `--start-with-windows on|off`,
+  `--no-autostart` (removes the sign-in task only if it starts this copy).
+- Selection box (smooth themes): while dragging, `Engine.DesktopStep` keeps a copy of the finished frame
+  (`Renderer.KeepStill`) and draws only the box over it (`DrawOver`) at the screen's refresh rate; the desktop under
+  it redraws at its own rate.
+- Fonts and icons (`Render\Fonts.cs`): `Fonts.Collection` = Windows' font set + every font file in `bin\fonts`
+  (shipped: Material Symbols Outlined, from repo `fonts\`, Apache 2.0) and `config\fonts` (the user's; Settings > Fonts
+  adds files or a Google Fonts .zip). Nothing is installed into Windows. `Symbols`: `{icon:name}` (Fmt, and
+  `Symbols.Expand` in Canvas) becomes the icon's private-use character; Canvas lays such text out and sets the icon
+  font on just those characters (`Symbols.Mark`: family, size × icon_size, FILL axis), so Nerd/Segoe icon fonts can't
+  take them over; the glyph atlas draws icons into one cell. Theme `[ui] icon_style/icon_fill/icon_size`; rounded and
+  sharp download once into `config\fonts`. Settings > Icons = searchable grid (GDI+ PrivateFontCollection) that copies
+  `{icon:name}`. Every font option uses `FontNameConverter` (DirectWrite family list incl. config\fonts); widgets have
+  Box > Font / Font size (Composer.UseFont).
+- Performance presets (`glyph.toml [performance]`): `plugged_in` / `on_battery` / `battery_saver` each pick
+  highest, balanced, low or pause; `[performance.highest|balanced|low]` hold each preset (fps max/theme/number,
+  effects, animation_detail max/theme/low, smooth_dragging). `Activity.Reason` picks the mode every 0.5 s and App
+  puts the preset in `Perf.Current`, read by the engine (frame rate from `Screens.RefreshRate`, effects), the noise
+  layer (`Perf.NoiseInterval`) and video widgets (`Perf.VideoFps`). Old keys (pause_on_battery_saver, battery_fps)
+  are read once by `PerformanceOptions.ReadOld`.
 - Also: `--snapshot out.png [--seconds N] [--size WxH] [--cursor x,y] [--theme NAME] [--bar]`, `--snapshot-bar out.png`,
   `--snapshot-launcher out.png [query]`, `--write-guide`, `--reset-example operator` (puts the built-in theme back).
   Set `GLYPH_HOME` to a folder with its own `config\` to test with other files; `GLYPH_DEBUG=1` logs clicks.
@@ -113,6 +144,33 @@ Glyph\
   thread runs only while a visualiser shows something playing). `Data\Status.cs`: {wifi} {network} via WinRT
   NetworkInformation (re-read on NetworkStatusChanged + every 20 s), {bluetooth} (Radio found once, then its State),
   {lang} (foreground thread's keyboard layout, LCIDToLocaleName). Bar `Unclash` moves the centre group off the sides.
+- **Menu / divider / tasks** (`Widgets\MenuWidget.cs`, `Widgets\DividerWidget.cs`, `Data\Tasks.cs`): the menu widget builds tabs
+  from shortcut groups (`ShortcutStore.Groups` = shortcuts.toml `[[group]]`, edited in Settings > Shortcuts > Groups;
+  the settings window keeps its own copy because the preview thread reloads the store), lays out tabs / heading / list /
+  details itself and animates each plate's fill (`Amount`, eased, `Animated` only while one is moving; frames take a
+  `wipe` 0-1 and draw the hover fill that far from the left). `Widget.Covers` = the parts that are really there, so the
+  selection box and background clicks still work in the empty space of a stretched widget. `Stretch` (WidgetOptions) +
+  `Widget.WantW/WantH/PlaceFor` size a box between its offsets. Bar `tasks`: EnumWindows like the taskbar (no owner,
+  not toolwindow/noactivate unless appwindow, not cloaked), cached 500 ms, icons per window; `task:<hwnd>` toggles
+  front/minimised (Alt tap when SetForegroundWindow is refused). Module `caption` wraps the module in a ColEl.
+  Backdrop `pattern`/`pattern2` and frame patterns share `Render\Patterns.cs`.
+- **Tweens** (`Render\Tween.cs`): `Easing` (Roblox's styles and directions), `TweenOptions` (animations.toml), `Animator`
+  (bound to widgets by Name / type: / * in `Composer.Load`; `Step` each composed frame, `Apply` wraps each widget's
+  DrawVector in a D2D transform about its centre + an opacity layer). Appear tweens keep their start across reloads when
+  the tween list is unchanged (signature of the written values). Preview: `UpdateHover` too, ~30 fps while tweens run,
+  `Replay()`.
+- **Design page parts** (`Widget.Parts()`, `UI\SettingsForm.Parts.cs`, `UI\PropertyView.cs`): widgets list parts (rect,
+  option categories, the option naming its frame); the preview sends them in `Info.Parts`; the smallest part under the
+  mouse wins. `PartView` = an ICustomTypeDescriptor showing only some categories (owner = the real object). `Friendly`
+  registers a TypeDescriptionProvider on every option class in the settings process only: category order (leading tabs),
+  spaced names, On/Off, colour swatches (`Swatch.Resolve`), read-only properties hidden.
+- **Tray** (`Data\Tray.cs`, bar module `tray`): a hidden top-most `Shell_TrayWnd` window on its own thread ("Glyph tray",
+  started by the first tray module, closed on quit) so `Shell_NotifyIcon` (WM_COPYDATA dwData 1: signature, NIM_*,
+  NOTIFYICONDATA with 32-bit handles; offsets in the file) reaches Glyph; every message (also appbar dwData 0 and
+  WM_USER+) is forwarded with SendMessageTimeout to Explorer's tray, found by process name (explorer.exe) so two
+  such windows can't forward to each other. Re-raised every 2 s; broadcasts "TaskbarCreated" at start and when
+  Explorer restarts. Clicks: v4 icons get (x,y | event, id) + NIN_SELECT / WM_CONTEXTMENU, older ones (id, event);
+  AllowSetForegroundWindow(owner pid) first. Glyph's own FindWindow("Shell_TrayWnd") uses `Tray.ExplorerTray()`.
 - **Converter loop** (`ConvertJob.Run`): crossfade decodes the clip minus its last `blend` frames plus a second ffmpeg for
   that tail, mixing tail frame i into head frame i (RGB before conversion); bounce stores cells and appends them reversed.
 - **Input**: raw input (RIDEV_INPUTSINK) on a hidden window gives left-button events anywhere; if the window under

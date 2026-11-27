@@ -19,6 +19,17 @@ internal static class Program
             if (args.Length > 0 && args[0] == "--write-guide") { Docs.WriteGuide(); return 0; }
             if (args.Length > 0 && args[0] == "--update") return Updater.Command(!args.Contains("--no-start"));
             if (args.Length > 0 && args[0] == "--scan-apps") return Glyph.Launcher.AppScan.Run();
+            if (args.Length > 0 && args[0] == "--quit") return QuitRunning();   // for the installer: close Glyph properly (icons, taskbar put back)
+            if (args.Length > 0 && args[0] == "--no-autostart") { Glyph.Desktop.Autostart.Apply(false, onlyMine: true); return 0; }   // for the uninstaller
+            if (args.Length > 1 && args[0] == "--start-with-windows")   // for the installer: on/off, saved in glyph.toml
+            {
+                var s = AppSettings.Load(new List<string>());
+                s.StartWithWindows = args[1] is "on" or "true" or "1";
+                s.Save();
+                Glyph.Desktop.Autostart.Apply(s.StartWithWindows);
+                if (s.StartWithWindows) Glyph.Desktop.Autostart.RememberHome();
+                return 0;
+            }
             if (args.Length > 1 && args[0] == "--action")   // e.g. for hotkeys from other programs: the running Glyph does it
             {
                 var action = string.Join(" ", args.Skip(1));
@@ -50,6 +61,7 @@ internal static class Program
         using var mutex = new Mutex(true, @"Local\Glyph.SingleInstance", out bool first);
         if (!first)
         {
+            if (args.Contains("--autostart")) return 0;   // signing in started it twice (old Run key and the task): fine
             MessageBox.Show("Glyph is already running. Look for the G icon in the system tray.", "Glyph");
             return 0;
         }
@@ -62,6 +74,23 @@ internal static class Program
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+
+    /// Glyph.exe --quit: asks a running Glyph to quit and waits (up to 15 s) for it to go.
+    static int QuitRunning()
+    {
+        var others = System.Diagnostics.Process.GetProcessesByName("Glyph").Where(p => p.Id != Environment.ProcessId).ToList();
+        if (others.Count == 0) return 0;
+        var until = DateTime.UtcNow.AddSeconds(15);
+        // a Glyph that is still starting can't hear yet: keep asking until it does (or has gone)
+        while (!Native.SendAction("glyph:quit") && DateTime.UtcNow < until && others.Any(p => { try { return !p.HasExited; } catch { return false; } }))
+            Thread.Sleep(200);
+        foreach (var p in others)
+        {
+            var left = until - DateTime.UtcNow;
+            if (left > TimeSpan.Zero) try { p.WaitForExit(left); } catch { }
+        }
+        return 0;
+    }
 
     static void BringToFront(string title)
     {
@@ -76,7 +105,7 @@ internal static class Program
     {
         const string Var = "DOTNET_GCgen0size";
         if (Environment.GetEnvironmentVariable(Var) != null) return false;
-        if (args.Length > 0 && args[0] != "--settings") return false;   // only the long-running parts
+        if (args.Length > 0 && args[0] is not ("--settings" or "--autostart")) return false;   // only the long-running parts
         try
         {
             var psi = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, WorkingDirectory = Environment.CurrentDirectory };

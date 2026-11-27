@@ -213,7 +213,7 @@ internal sealed class VideoWidget : Widget
         else dest = new RectangleF(vis.X + (vis.Width - cw * dx) / 2, vis.Y + (vis.Height - ch * dy) / 2, cw * dx, ch * dy);
         if (!asChars) dest = vis;
         cols = cw; rows = ch; gw = (int)dx; gh = (int)dy;
-        double fps = Math.Min(v.SrcFps, Math.Max(1, o.MaxFps));
+        double fps = Perf.VideoFps(v.SrcFps, o.MaxFps);
         v.Configure(sw, sh, cw, ch, fps);
         if (Playing) v.Want((int)(play * v.OutFps));
         if (v.Ended && !o.Loop) ended = true;
