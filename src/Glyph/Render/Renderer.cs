@@ -70,6 +70,8 @@ internal sealed class Renderer : IDisposable
 
     IDCompositionDevice? dcomp; IDCompositionTarget? dtarget; IDCompositionVisual? dvisual;
     readonly bool composition;
+    /// Drawn see-through (DirectComposition): the bar, or a desktop over a Wallpaper Engine wallpaper.
+    public bool Composition => composition;
 
     readonly Gpu gpu;
 
@@ -211,6 +213,7 @@ internal sealed class Renderer : IDisposable
         if (w == Width && h == Height) return;
         DropScene();
         DropStill();
+        DropOverlay();
         DropOut();
         if (swap != null)
         {
@@ -242,8 +245,18 @@ internal sealed class Renderer : IDisposable
     {
         DropScene();
         DropStill();
+        DropOverlay();
         Canvas.Reset();
         ctx.Flush();
+        TrimDevice();
+    }
+
+    /// Gives back what Direct2D and the graphics driver keep for later (effect working surfaces, spare memory),
+    /// without throwing away anything Glyph itself still needs. Cheap; for quiet moments.
+    public void TrimDevice()
+    {
+        try { d2dDevice.ClearResources(0); } catch { }
+        try { ctx.Flush(); using var d3 = Device.QueryInterface<IDXGIDevice3>(); d3.Trim(); } catch { }
     }
 
     /// Keeps a copy of the frame just drawn (call before Present), for DrawOver(fromStill: true).
@@ -265,6 +278,12 @@ internal sealed class Renderer : IDisposable
     public bool HasStill => still != null;
 
     public void DropStill() { still?.Dispose(); still = null; }
+
+    ID2D1Bitmap1? overlayBmp;
+    /// How the widgets layer is drawn next frame: 0 = straight in, 1 = into the kept picture (and shown), 2 = reuse it.
+    public int OverlayMode;
+    public bool HasOverlay => overlayBmp != null;
+    void DropOverlay() { if (overlayBmp == null) return; dc.Target = null; overlayBmp.Dispose(); overlayBmp = null; }
 
     /// Draws smooth shapes straight onto the window's buffer: over the frame just drawn, or (fromStill)
     /// over a fresh copy of the kept frame. Much cheaper than a whole frame.
@@ -362,12 +381,18 @@ internal sealed class Renderer : IDisposable
 
     void Unbind() => ctx.PSSetShaderResources(0, new ID3D11ShaderResourceView[] { null!, null! });
 
+    static int endDrawErrors;
+
     void D2D(Action<Canvas> draw, ID2D1Bitmap1 target)
     {
         dc.Target = target;
         dc.BeginDraw();
         try { draw(Canvas); }
-        finally { dc.EndDraw(); }
+        finally
+        {
+            var r = dc.EndDraw();
+            if (r.Failure && endDrawErrors++ < 5) Log.Write($"drawing failed: 0x{r.Code:X8}");
+        }
     }
 
     public void Draw(Grid g, EffectSettings fx, float time, Rgba clear, Action<Canvas>? under = null, Action<Canvas>? overlay = null)
@@ -427,8 +452,23 @@ internal sealed class Renderer : IDisposable
         Pass(target, Width, Height, psGrid, cellsSrv!, atlas.Srv);
         ctx.OMSetBlendState(null);
 
-        // 3. smooth widgets
-        if (overlay != null) D2D(overlay, d2dTarget);
+        // 3. smooth widgets: drawn straight in, or (while the wallpaper moves under unchanged widgets) drawn once into
+        // a kept picture that later frames reuse
+        if (overlay != null)
+        {
+            if (OverlayMode == 0) { DropOverlay(); D2D(overlay, d2dTarget); }
+            else
+            {
+                if (OverlayMode == 1 || overlayBmp == null)
+                {
+                    overlayBmp ??= dc.CreateBitmap(new Vortice.Mathematics.SizeI(Width, Height), IntPtr.Zero, 0, new BitmapProperties1(
+                        new Vortice.DCommon.PixelFormat(Format.B8G8R8A8_UNorm, Vortice.DCommon.AlphaMode.Premultiplied), 96, 96, BitmapOptions.Target));
+                    D2D(c => { c.Dc.Clear(new Color4(0, 0, 0, 0)); overlay(c); }, overlayBmp);
+                }
+                var ob = overlayBmp;
+                D2D(c => c.Dc.DrawBitmap(ob, 1, Vortice.Direct2D1.BitmapInterpolationMode.NearestNeighbor), d2dTarget);
+            }
+        }
         if (direct) return;
 
         // 4. effects
@@ -540,9 +580,12 @@ internal sealed class Renderer : IDisposable
         DropScene();
         DropOut();
         DropStill();
+        DropOverlay();
+        dc.Target = null;
         cellsSrv?.Dispose(); cellsTex?.Dispose();
         Atlas?.Dispose();
         Canvas.Dispose();
+        if (dtarget != null) { try { dtarget.SetRoot(null); dcomp!.Commit(); } catch { } }   // unhook the window first
         backRtv?.Dispose(); dvisual?.Dispose(); dtarget?.Dispose(); dcomp?.Dispose(); swap?.Dispose(); offRtv?.Dispose(); offscreen?.Dispose();
         ctx.Flush();
         gpu.Release();

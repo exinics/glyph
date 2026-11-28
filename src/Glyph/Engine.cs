@@ -23,6 +23,7 @@ internal sealed class Engine
     /// The main screen's theme (theme sync, window frames, tiling and the launcher use it).
     public volatile Theme? CurrentTheme;
     /// What the app should set up after a reload: a wallpaper window on each of these screens, and a bar where set.
+    public volatile IReadOnlyList<(ScreenInfo screen, Glyph.Data.WallpaperEngine.Item item, bool mute)> EngineWallpapers = Array.Empty<(ScreenInfo, Glyph.Data.WallpaperEngine.Item, bool)>();
     public volatile IReadOnlyList<(ScreenInfo screen, BarOptions? bar)> Plan = Array.Empty<(ScreenInfo, BarOptions?)>();
     public event Action? Reloaded;
     /// Raised on the render thread when a shortcut should open (the app runs it on the UI thread).
@@ -107,6 +108,11 @@ internal sealed class Engine
         public double Last, Time, PausedAt = -1, LastDrawAt, LastFullAt, RefreshAt = -1;
         public int RefreshHz = 60;
         public bool FullPending;   // dragging a box: the desktop itself wants a redraw, waiting for its turn
+        public double SigAt = -1, BarSigAt = -1, MovedAt = -1;
+        public readonly Grid KeptGrid = new();   // the characters of the last frame shown
+        public int LastDrawW, LastDrawH;
+        public string FontCheck = "", BarFontCheck = "";   // what the font was worked out from (so it isn't redone every tick)   // when the widgets' / bar's contents were last checked for changes
+        public bool WidgetsDirty = true;            // the widgets look different from the kept picture of them
         // bar
         public Renderer? BarR;
         public readonly Grid BarGrid = new();
@@ -160,6 +166,19 @@ internal sealed class Engine
         CurrentSettings = main?.Comp.App ?? app;
         CurrentTheme = main?.Comp.Theme;
         Plan = next.Select(f => (f.S, f.ShowBar && f.Bar.Enabled ? f.Bar.O : (BarOptions?)null)).ToList();
+        // screens whose theme plays a Wallpaper Engine wallpaper: drawn see-through over it (the app starts it)
+        var we = new List<(ScreenInfo screen, Glyph.Data.WallpaperEngine.Item item, bool mute)>();
+        foreach (var f in next)
+        {
+            var b = f.Comp.Scene.Options.Backdrop;
+            var item = f.Comp.UsesEngine ? Glyph.Data.WallpaperEngine.Find(b.Engine) : null;
+            if (f.Comp.UsesEngine && item == null) f.Comp.Problems.Add(Glyph.Data.WallpaperEngine.Installed
+                ? $"wallpaper.toml: Wallpaper Engine has no wallpaper \"{b.Engine}\" (pick one in Settings > Wallpaper)"
+                : "wallpaper.toml: the backdrop is a Wallpaper Engine wallpaper, but Wallpaper Engine isn't installed");
+            f.Comp.LiveEngine = item != null;
+            if (item != null) we.Add((f.S, item, b.EngineMute));
+        }
+        EngineWallpapers = we;
         if (Launcher is { } lh && main != null) { lh.Scene.Theme = main.Comp.Theme; lh.Scene.O = main.Comp.Theme.Options.Launcher; lastLSig = ""; }
         Log.Write($"screens: {string.Join(", ", next.Select(f => $"{f.S.Number} = {f.ThemeName}{(f.Widgets ? "" : " (no widgets)")}{(f.ShowBar && f.Bar.Enabled ? "" : " (no bar)")}"))} ({app.Monitors.Mode})");
     }
@@ -236,12 +255,12 @@ internal sealed class Engine
                     }
                     if (!barPaused) { allResting = false; BarStep(f); }
                     else f.BarMouse.Clear();
-                    if (!desktopPaused && !f.IdleTrimmed && now - f.LastDrawAt > 60) { f.IdleTrimmed = true; Native.TrimMemory(); Log.D("trimmed memory (idle)"); }
+                    if (!desktopPaused && !f.IdleTrimmed && now - f.LastDrawAt > 20) { f.IdleTrimmed = true; f.R?.TrimDevice(); f.BarR?.TrimDevice(); Native.TrimMemory(); Log.D("trimmed memory (idle)"); }
                 }
                 launcherOpen = surfaces.Length > 0 && LauncherStep(surfaces[0].Comp);
                 if (Log.Debug) loopMs += (clock.Elapsed.TotalSeconds - now) * 1000;
 
-                if (trimAt > 0 && now >= trimAt && (!surfaces.Any(f => f.Comp.Widgets.Any(w => w.Animated)) || now >= trimAt + 20)) { trimAt = -1; Native.TrimMemory(); Log.D("trimmed memory"); }
+                if (trimAt > 0 && now >= trimAt && (!surfaces.Any(f => f.Comp.Widgets.Any(w => w.Animated)) || now >= trimAt + 20)) { trimAt = -1; foreach (var f in surfaces) { f.R?.TrimDevice(); f.BarR?.TrimDevice(); } Native.TrimMemory(); Log.D("trimmed memory"); }
                 if (Log.Debug && now - memT >= 15) { memT = now; LogMemory(); }
                 if (now - statT >= 2)
                 {
@@ -289,24 +308,30 @@ internal sealed class Engine
         var comp = f.Comp;
         var (hwnd, g) = host.Current(f.S.Number);
         if (hwnd == IntPtr.Zero) return (false, 5);
-        if (f.R == null || g != f.Gen)
+        if (f.R == null || g != f.Gen || f.R.Composition != comp.LiveEngine)
         {
             f.R?.Dispose(); f.R = null;
             Native.GetClientRect(hwnd, out var rc0);
-            f.R = new Renderer(hwnd, rc0.Width, rc0.Height, share: AnyRenderer());
-            f.Gen = g; f.FontKey = ""; f.CompGen = -1; f.Force = true;
+            f.R = new Renderer(hwnd, rc0.Width, rc0.Height, composition: comp.LiveEngine, share: AnyRenderer());
+            f.Gen = g; f.FontKey = ""; f.FontCheck = ""; f.CompGen = -1; f.Force = true;
             if (surfaces.All(x => x == f || x.R == null || x.Gen == g)) host.Acknowledge(g);
         }
         var r = f.R;
         if (comp.Generation != f.CompGen) { r.Canvas.Reset(); f.CompGen = comp.Generation; f.Force = true; }
-        var font = Screens.Scaled(comp.Font, f.Scale);
-        if (font.Key != f.FontKey)
+        // the font's key is a string built from all its settings: only worked out again when something changed
+        var fontCheck = $"{comp.Generation}|{f.Scale}|{Fonts.Version}";
+        if (fontCheck != f.FontCheck)
         {
-            comp.RenderProblems.Clear();
-            var fp = r.SetFont(font);
-            if (fp != null) comp.RenderProblems.Add(fp);
-            f.FontKey = font.Key;
-            f.Force = true;
+            f.FontCheck = fontCheck;
+            var font = Screens.Scaled(comp.Font, f.Scale);
+            if (font.Key != f.FontKey)
+            {
+                comp.RenderProblems.Clear();
+                var fp = r.SetFont(font);
+                if (fp != null) comp.RenderProblems.Add(fp);
+                f.FontKey = font.Key;
+                f.Force = true;
+            }
         }
 
         Native.GetClientRect(hwnd, out var rc);
@@ -330,14 +355,23 @@ internal sealed class Engine
         bool selChanged = moved && comp.DragTo(mx, my);
         bool animated = comp.Animated;
         comp.Env.Canvas = r.Canvas;
-        var sig = comp.Signature();
-        bool changed = sig != f.LastSig;
-        f.LastSig = sig;
+        // what the widgets show is checked 4 times a second (rebuilding every widget's contents on every tick was
+        // most of the idle CPU); input, a reload or a resize checks straight away
+        bool changed = false;
+        if (f.Force || resized || hoverChanged || clicked || selChanged || f.SigAt < 0 || now - f.SigAt >= 0.25)
+        {
+            f.SigAt = now;
+            var sig = comp.Signature();
+            changed = sig != f.LastSig;
+            f.LastSig = sig;
+        }
         bool mouseLook = moved && here && (comp.Scene.CursorOn || comp.Scene.Parallax);
         int refresh = Refresh(f, now);
         int deskFps = Math.Max(1, Perf.Current.FrameRate(refresh, comp.Scene.Fps));
         lastDeskFps = deskFps;
         bool draw = f.Force || resized || hoverChanged || clicked || animated || changed || selChanged || mouseLook;
+        // the widgets themselves need drawing again (otherwise a frame drawn for the moving wallpaper reuses them)
+        if (f.Force || resized || hoverChanged || clicked || changed || selChanged || comp.OverlayMoving) f.WidgetsDirty = true;
 
         // Dragging a selection box in a smooth theme: the box is drawn over a kept copy of the desktop as often
         // as the screen shows frames; the desktop under it is only redrawn at its own frame rate. (Drawing the
@@ -361,10 +395,17 @@ internal sealed class Engine
         if (comp.SelectionApart) { comp.SelectionApart = false; f.FullPending = false; r.DropStill(); draw = true; }
 
         // nothing moving: still look at the mouse often enough for hover and the mouse glow to answer quickly
-        int fps = animated || comp.Scene.CursorOn ? deskFps : Perf.Current.Fps.Trim() == "max" ? refresh : Math.Min(deskFps, 15);
+        // nothing moving: look at the mouse often while it moves (hover and spotlights answer smoothly), and only
+        // 10 times a second while it's still (the first move is then noticed within 0.1 s)
+        if (moved && here) f.MovedAt = now;
+        bool mouseBusy = f.MovedAt >= 0 && now - f.MovedAt < 0.6;
+        // only the wallpaper's own layers move (sparks, rain, smoke): they run at the preset's Wallpaper animation rate
+        bool onlyWallpaper = animated && comp.Scene.Animated && !comp.OverlayMoving && !comp.Scene.CursorOn && !mouseBusy;
+        int fps = onlyWallpaper ? Perf.Current.WallpaperRate(refresh, comp.Scene.Fps)
+                : animated || comp.Scene.CursorOn ? deskFps : !mouseBusy ? Math.Min(deskFps, 10) : Perf.Current.Fps.Trim() == "max" ? refresh : Math.Min(deskFps, 30);
         if (!draw) { f.Last = now; return (false, fps); }
 
-        FullFrame(f, comp, r, now, rc, mx, my, area);
+        if (!FullFrame(f, comp, r, now, rc, mx, my, area, mayskip: true)) return (false, fps);
         if (!r.Present()) { Log.Write("graphics device lost; rebuilding"); r.Dispose(); f.R = null; }
         return (true, fps);
     }
@@ -376,16 +417,48 @@ internal sealed class Engine
         return f.RefreshHz;
     }
 
-    static void FullFrame(Surface f, Composer comp, Renderer r, double now, Native.RECT rc, float mx, float my, RectangleF area)
+    /// Draws a whole frame. Returns false when it came out exactly like the last one (only possible with
+    /// `mayskip`): then nothing is drawn or shown, which saves the GPU work and the wait for the screen.
+    static bool FullFrame(Surface f, Composer comp, Renderer r, double now, Native.RECT rc, float mx, float my, RectangleF area, bool mayskip = false)
     {
+        bool forced = f.Force;
         f.Force = false;
         float dt = (float)Math.Min(0.1, now - f.Last);
         f.Last = now; f.Time += dt;
         r.Resize(rc.Width, rc.Height);
         var atlas = r.Atlas!;
+        // only the wallpaper moves: keep the widgets' picture from the last frame instead of drawing them again
+        bool keepWidgets = !f.WidgetsDirty && comp.Theme.Smooth && r.HasOverlay;
+        comp.LayoutWidgets = !keepWidgets;
         comp.Compose(r.Width, r.Height, atlas.CellW, atlas.CellH, (float)f.Time, dt, mx, my, area);
-        r.Draw(comp.Grid, Perf.Current.Effects ? comp.Effects : Perf.NoEffects, (float)f.Time, comp.ClearColor,
+        r.OverlayMode = !comp.Theme.Smooth ? 0 : keepWidgets ? 2 : comp.Scene.Animated && !comp.OverlayMoving ? 1 : 0;   // 1 = draw and keep, 2 = reuse
+        f.WidgetsDirty = false;
+        // the characters often stay put between frames (slow sparks, rain moving a cell at a time): if the grid is
+        // the same as last time, the widgets are reused and no time-based screen effect runs, there's nothing new
+        bool fx = Perf.Current.Effects && !comp.LiveEngine && comp.Effects.Enabled;
+        bool same = SameGrid(f, comp.Grid);
+        if (mayskip && same && keepWidgets && !forced && !fx && r.Width == f.LastDrawW && r.Height == f.LastDrawH) return false;
+        f.LastDrawW = r.Width; f.LastDrawH = r.Height;
+        // over a Wallpaper Engine wallpaper the screen effects (glow, scanlines…) are left out: they'd make it opaque
+        r.Draw(comp.Grid, Perf.Current.Effects && !comp.LiveEngine ? comp.Effects : Perf.NoEffects, (float)f.Time, comp.ClearColor,
             comp.HasBackdrop ? comp.Scaled(comp.DrawBackdrop) : null, comp.HasVectorLayer ? comp.Scaled(comp.DrawWidgets) : null);
+        return true;
+    }
+
+    /// Compares the grid with the copy kept from the last frame (and keeps it when it changed).
+    static bool SameGrid(Surface f, Grid g)
+    {
+        int n = g.W * g.H;
+        var k = f.KeptGrid;
+        bool same = k.W == g.W && k.H == g.H && k.ShiftX == g.ShiftX && k.ShiftY == g.ShiftY
+                    && g.Ch.AsSpan(0, n).SequenceEqual(k.Ch.AsSpan(0, Math.Min(n, k.Ch.Length)))
+                    && g.Fg.AsSpan(0, n).SequenceEqual(k.Fg.AsSpan(0, Math.Min(n, k.Fg.Length)))
+                    && g.Bg.AsSpan(0, n).SequenceEqual(k.Bg.AsSpan(0, Math.Min(n, k.Bg.Length)));
+        if (same) return true;
+        if (k.W != g.W || k.H != g.H) k.Resize(g.W, g.H);
+        g.Ch.AsSpan(0, n).CopyTo(k.Ch); g.Fg.AsSpan(0, n).CopyTo(k.Fg); g.Bg.AsSpan(0, n).CopyTo(k.Bg);
+        k.ShiftX = g.ShiftX; k.ShiftY = g.ShiftY;
+        return false;
     }
 
     void BarStep(Surface f)
@@ -403,12 +476,17 @@ internal sealed class Engine
         {
             f.BarR?.Dispose(); f.BarR = null;
             f.BarR = new Renderer(bh, bw, bhh, composition: true, share: AnyRenderer());
-            f.BarGen = bg; f.BarFontKey = ""; f.BarCompGen = -1; f.BarForce = true;
+            f.BarGen = bg; f.BarFontKey = ""; f.BarFontCheck = ""; f.BarCompGen = -1; f.BarForce = true;
         }
         var barR = f.BarR;
         if (comp.Generation != f.BarCompGen) { barR.Canvas.Reset(); f.BarCompGen = comp.Generation; f.BarForce = true; }
-        var bf = Screens.Scaled(bar.BarFont(), f.Scale);
-        if (bf.Key != f.BarFontKey) { barR.SetFont(bf); f.BarFontKey = bf.Key; f.BarForce = true; }
+        var barFontCheck = $"{comp.Generation}|{f.Scale}|{Fonts.Version}";
+        if (barFontCheck != f.BarFontCheck)
+        {
+            f.BarFontCheck = barFontCheck;
+            var bf = Screens.Scaled(bar.BarFont(), f.Scale);
+            if (bf.Key != f.BarFontKey) { barR.SetFont(bf); f.BarFontKey = bf.Key; f.BarForce = true; }
+        }
         float vs = comp.Theme.Smooth ? f.Scale : 1;   // smooth bars are laid out in pixels ÷ scale and drawn scaled up
         if (barR.Width != bw || barR.Height != bhh) { barR.Resize(bw, bhh); f.BarForce = true; }
         var atlas = barR.Atlas!;
@@ -428,6 +506,10 @@ internal sealed class Engine
         int hover = f.BarMouseX < 0 ? -1 : bar.HitTest(f.BarMouseX, f.BarMouseY);
         if (hover != bar.Hover) { bar.Hover = hover; f.BarForce = true; }
 
+        // the bar's contents are checked 4 times a second, or straight away after a click, hover or reload
+        double bnow = Environment.TickCount64 / 1000.0;
+        if (!f.BarForce && f.BarSigAt >= 0 && bnow - f.BarSigAt < 0.25) return;
+        f.BarSigAt = bnow;
         var sig = bar.Signature(atlas.CellW, atlas.CellH, barR.Canvas);
         if (sig == f.LastBarSig && !f.BarForce) return;
         f.LastBarSig = sig; f.BarForce = false;

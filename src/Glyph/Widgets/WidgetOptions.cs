@@ -16,6 +16,7 @@ internal sealed class WidgetsFile
         ["text"] = () => new TextOptions(), ["command"] = () => new CommandOptions(), ["sysinfo"] = () => new SysInfoOptions(),
         ["image"] = () => new ImageOptions(), ["video"] = () => new VideoOptions(), ["audio"] = () => new AudioOptions(),
         ["feed"] = () => new FeedOptions(), ["menu"] = () => new MenuOptions(), ["divider"] = () => new DividerOptions(), ["themes"] = () => new ThemesOptions(), ["toggles"] = () => new TogglesOptions(),
+        ["list"] = () => new ListOptions(), ["lyrics"] = () => new LyricsOptions(), ["visualiser"] = () => new VisualiserOptions(),
     };
 
     /// Short descriptions for the settings window's "Add widget" menu and the guide.
@@ -30,6 +31,9 @@ internal sealed class WidgetsFile
         ["divider"] = "a line across or down the screen: solid, dashed, dotted, double or a printed-form band",
         ["themes"] = "cards for your themes (wallpaper picture, colours, name); click one to switch to it",
         ["toggles"] = "quick buttons (Wi-Fi, Bluetooth, mute, snip, lock…) that light up when on and rise under the mouse",
+        ["list"] = "a to-do list you tick by clicking, an agenda (time, item, note) or plain lines; edit its items in the settings window",
+        ["lyrics"] = "the words of the song playing, the line being sung highlighted (synced lyrics from lrclib.net)",
+        ["visualiser"] = "big audio bars that bounce with whatever is playing",
     };
 
     public static string FilePath(string theme) => Path.Combine(Paths.ThemeDir(theme), "widgets.toml");
@@ -91,9 +95,15 @@ internal abstract class WidgetOptions
     [Category("Transform"), DisplayName("Tilt Y"), Description("Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back."), Range(-80, 80)] public float TiltY { get; set; }
     [Category("Transform"), DisplayName("Depth"), Description("How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance."), Range(100, 20000)] public float Depth { get; set; } = 1600;
     [Category("Transform"), DisplayName("Tilt to mouse"), Description("Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off."), Range(0, 45)] public float TiltFollow { get; set; }
-    [Category("Transform"), DisplayName("Tilt around"), Description("Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle.")] public string TiltAround { get; set; } = "";
+    [Category("Transform"), DisplayName("Tilt around"), Description("Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). That widget's animations (and its Tilt to mouse) carry this one along too. Empty = around its own middle.")] public string TiltAround { get; set; } = "";
     [Category("Transform"), Description("Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text)."), Range(-360, 360)] public float Rotate { get; set; }
     [Category("Transform"), DisplayName("Opacity"), Description("See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark."), Range(0, 1)] public float Alpha { get; set; } = 1;
+    [Category("Glow & halo"), DisplayName("Halo"), Description("Smooth style: a soft blur of this colour behind the widget, so its text stays readable on a light wallpaper. auto = the theme's (Colours & look), none = off."), Color, TypeConverter(typeof(ColorNameConverter))] public string Halo { get; set; } = "auto";
+    [Category("Glow & halo"), DisplayName("Halo size"), Description("Pixels. 0 = the theme's."), Range(0, 60)] public float HaloSize { get; set; }
+    [Category("Glow & halo"), DisplayName("Halo strength"), Description("-1 = the theme's. Up to 2 for very light wallpapers."), Range(-1, 2)] public float HaloStrength { get; set; } = -1;
+    [Category("Glow & halo"), DisplayName("Glow"), Description("Smooth style: the widget lights up. self = in its own colours, a colour = in that colour, auto = the theme's, none = off."), TypeConverter(typeof(GlowNameConverter))] public string Glow { get; set; } = "auto";
+    [Category("Glow & halo"), DisplayName("Glow size"), Description("Pixels. 0 = the theme's."), Range(0, 80)] public float GlowSize { get; set; }
+    [Category("Glow & halo"), DisplayName("Glow strength"), Description("-1 = the theme's."), Range(-1, 3)] public float GlowStrength { get; set; } = -1;
     [Category("Link"), DisplayName("Link to"), Description("Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style.")] public string LinkTo { get; set; } = "";
     [Category("Link"), DisplayName("Link colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string LinkColor { get; set; } = "accent_dim";
     [Category("Link"), DisplayName("Link width"), Range(0.5, 20)] public float LinkWidth { get; set; } = 1;
@@ -193,12 +203,14 @@ internal sealed class SystemOptions : PanelOptions
 {
     public override string Type => "system";
     public SystemOptions() { Title = "system"; Anchor = "top_right"; OffsetY = 260; Width = 300; }
-    [Category("System"), Description("What to show, in order: cpu, ram, disk, net, battery, volume."), TypeConverter(typeof(ListConverter))] public string[] Show { get; set; } = { "cpu", "ram", "disk", "net" };
+    [Category("System"), Description("What to show, in order: cpu, ram, disk, net, battery, volume, uptime, netup (network speeds and uptime on one small line)."), TypeConverter(typeof(ListConverter))] public string[] Show { get; set; } = { "cpu", "ram", "disk", "net" };
     [Category("System"), Description("Draw a history graph under CPU and network.")] public bool Graphs { get; set; } = true;
     [Category("System"), DisplayName("Graph rows"), Description("Height of the graphs, in lines of text."), Range(1, 10)] public int GraphRows { get; set; } = 2;
     [Category("System"), DisplayName("Meter characters"), Description("Terminal style: the filled and empty characters of a meter, e.g. █░, ▮▯, =-, ■□.")] public string MeterChars { get; set; } = "█░";
     [Category("System"), DisplayName("Meter blocks"), Description("Smooth style: draw meters as this many separate blocks. 0 = smooth bars."), Range(0, 100)] public int Segments { get; set; }
     [Category("System"), DisplayName("Meters on one line"), Description("Smooth style: label, meter and value on one line instead of the meter under the label.")] public bool OneLine { get; set; }
+    [Category("System"), DisplayName("Label width"), Description("Meters on one line: pixels kept for the labels, so the bars line up. 0 = each label's own width."), Range(0, 400)] public float LabelWidth { get; set; }
+    [Category("System"), DisplayName("Value width"), Description("Meters on one line: pixels kept for the values on the right, so the bars end together. 0 = each value's own width."), Range(0, 400)] public float ValueWidth { get; set; }
     [Category("System"), Description("Which drive the disk line shows.")] public string Drive { get; set; } = "C";
 }
 

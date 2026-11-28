@@ -77,8 +77,12 @@ internal sealed class WallpaperOptions
 
 internal sealed class BackdropOptions
 {
-    [Description("solid = one colour, gradient = a blend of colours, image = a picture."), Choices("solid", "gradient", "image"), TypeConverter(typeof(ChoicesConverter))]
+    [Description("solid = one colour, gradient = a blend of colours, image = a picture, wallpaper_engine = a live wallpaper played by Wallpaper Engine (pick it below) with Glyph's widgets and bar on top."), Choices("solid", "gradient", "image", "wallpaper_engine"), TypeConverter(typeof(ChoicesConverter))]
     public string Type { get; set; } = "solid";
+    [DisplayName("Wallpaper Engine wallpaper"), Description("wallpaper_engine: which of your Wallpaper Engine wallpapers plays under this theme (Workshop subscriptions and your own). A Workshop id, a title or a folder can be typed too. Glyph starts Wallpaper Engine for it, and closes it again for themes that don't use one. Previews and snapshots show the wallpaper's preview picture."), TypeConverter(typeof(Glyph.Data.EngineWallpaperConverter))]
+    public string Engine { get; set; } = "";
+    [DisplayName("Mute Wallpaper Engine"), Description("wallpaper_engine: silence the wallpaper's own sound.")]
+    public bool EngineMute { get; set; } = true;
     [Description("The colour for solid (and behind a picture)."), Color, TypeConverter(typeof(ColorNameConverter))]
     public string Color { get; set; } = "bg";
     [Description("Gradient colours, first to last."), Color, TypeConverter(typeof(ListConverter))]

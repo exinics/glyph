@@ -84,8 +84,8 @@ internal sealed class FrameOptions
     [Category("4. Border"), DisplayName("Inner gap"), Description("Pixels between the border and the inner border."), Range(0, 100)] public float InnerGap { get; set; } = 3;
     [Category("4. Border"), DisplayName("Inner opacity"), Range(0, 1)] public float InnerOpacity { get; set; } = 0.6f;
 
-    [Category("5. Title"), Description("Where the title goes. plain = top-left inside. bar = a strip across the top. tab = a tab sticking up from the top edge. line = the title with a line running to the right. above = over the box with a line. none = no title."),
-     Choices("plain", "bar", "tab", "line", "above", "none"), TypeConverter(typeof(ChoicesConverter))]
+    [Category("5. Title"), Description("Where the title goes. plain = top-left inside. bar = a strip across the top. tab = a tab sticking up from the top edge. line = the title with a line running to the right. underline = the title with a thin line across the whole box under it (a section heading). legend = the title in the middle of the top border, the border broken around it (a fieldset). above = over the box with a line. none = no title."),
+     Choices("plain", "bar", "tab", "line", "underline", "legend", "above", "none"), TypeConverter(typeof(ChoicesConverter))]
     public string Header { get; set; } = "plain";
     [Category("5. Title"), DisplayName("Title colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string TitleColor { get; set; } = "accent";
     [Category("5. Title"), DisplayName("Right text colour"), Description("For the text on the right of the title (Title right)."), Color, TypeConverter(typeof(ColorNameConverter))] public string TitleRightColor { get; set; } = "dim";
@@ -154,7 +154,7 @@ internal static class FramePainter
 
     /// Space above the box itself (for tab and above titles).
     public static float Above(FrameOptions f, Theme t, float baseSize, bool hasTitle) =>
-        !hasTitle ? 0 : f.Header switch { "tab" => StripH(f, t, baseSize), "above" => TitleSize(f, t, baseSize) * 1.6f, _ => 0 };
+        !hasTitle ? 0 : f.Header switch { "tab" => StripH(f, t, baseSize), "above" => TitleSize(f, t, baseSize) * 1.6f, "legend" => TitleSize(f, t, baseSize) * 0.75f, _ => 0 };
 
     /// Space between the outer edge (including a tab) and the contents.
     public static Insets Space(FrameOptions f, Theme t, float baseSize, bool hasTitle)
@@ -166,6 +166,8 @@ internal static class FramePainter
             {
                 "bar" => StripH(f, t, baseSize),
                 "plain" or "line" => TitleSize(f, t, baseSize) * 1.5f,
+                "underline" => TitleSize(f, t, baseSize) * 2.6f,
+                "legend" => TitleSize(f, t, baseSize) * 0.5f,
                 _ => 0,
             };
         float slant = Math.Abs(f.Slant);
@@ -366,6 +368,27 @@ internal static class FramePainter
             }
         }
 
+        // legend: the title sits in a gap in the top border
+        bool legend = hasTitle && f.Header == "legend";
+        if (legend)
+        {
+            float lw = tw + tsize * 1.2f, lx = box.X + (box.Width - lw) / 2;
+            using var path = fac.CreatePathGeometry();
+            using (var sink = path.Open())
+            {
+                sink.SetFillMode(FillMode.Alternate);
+                void Rect(float x0, float y0, float x1, float y1)
+                {
+                    sink.BeginFigure(V(x0, y0), FigureBegin.Filled);
+                    sink.AddLine(V(x1, y0)); sink.AddLine(V(x1, y1)); sink.AddLine(V(x0, y1));
+                    sink.EndFigure(FigureEnd.Closed);
+                }
+                Rect(box.X - 50, box.Y - 50, box.Right + 50, box.Bottom + 50);
+                Rect(lx, box.Y - tsize, lx + lw, box.Y + Math.Max(2, f.BorderWidth) + 1);
+                sink.Close();
+            }
+            PushClip(c, path, RectangleF.Inflate(box, 50, 50));
+        }
         // border
         if (f.Border != "none" && f.BorderWidth > 0 && f.BorderOpacity > 0)
         {
@@ -392,6 +415,12 @@ internal static class FramePainter
             }
             style?.Dispose();
         }
+        if (legend)
+        {
+            dc.PopLayer();
+            float lh = tsize * 1.5f;
+            DrawText(c, title, box.X + (box.Width - tw) / 2, box.Y - lh / 2, lh, titleC, tfont, tsize, f.TitleBold, f.TitleSpacing);
+        }
         if (f.Border != "none" || f.Spotlight != "none") SpotlightOn(c, f, t, shape, box, true);
         if (f.InnerBorder != "none" && f.InnerOpacity > 0)
         {
@@ -416,12 +445,18 @@ internal static class FramePainter
                 DrawText(c, titleRight, box.Right - rw - p, y0, y1 - y0, t[f.TitleRightColor], tfont, tsize * 0.9f, false, f.TitleSpacing);
             }
         }
-        else if (hasTitle && f.Header is "plain" or "line")
+        else if (hasTitle && f.Header is "plain" or "line" or "underline")
         {
             float lh = tsize * 1.5f, x = box.X + p + bw + slantPad, y = box.Y + Pad(f, t) * 0.75f + bw;
             DrawText(c, title, x, y, lh, titleC, tfont, tsize, f.TitleBold, f.TitleSpacing);
             float rw = titleRight.Length > 0 ? MeasureText(c, titleRight, tfont, tsize * 0.9f, false, f.TitleSpacing) : 0;
             if (rw > 0) DrawText(c, titleRight, box.Right - p - bw - slantPad - rw, y, lh, t[f.TitleRightColor], tfont, tsize * 0.9f, false, f.TitleSpacing);
+            if (f.Header == "underline")
+            {
+                var lc = t[f.HeaderLine != "none" ? f.HeaderLine : f.Border != "none" ? f.Border : f.TitleColor];
+                float ly = y + lh + tsize * 0.3f, lx0 = box.X + p + bw + slantPad, lx1 = box.Right - p - bw - slantPad;
+                if (lx1 > lx0) { dc.FillRectangle(new Rect(lx0, ly, lx1 - lx0, 1), c.Brush(lc)); LineTicks(c, f, lc, lx0, lx1, ly); }
+            }
             if (f.Header == "line")
             {
                 var lc = t[f.HeaderLine != "none" ? f.HeaderLine : f.Border != "none" ? f.Border : f.TitleColor];

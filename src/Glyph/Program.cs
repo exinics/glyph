@@ -181,13 +181,13 @@ internal static class Program
         using var comp = new Composer();
         comp.Load(themeName);
         Glyph.Bar.BarScene? bar = null;
-        RectangleF? area = null;
+        RectangleF? area = null; RectangleF barAt = default;
         if (withBar)
         {
             bar = new Glyph.Bar.BarScene();
             bar.Load(comp.Theme, comp.Problems);
             if (!bar.Enabled) bar = null;
-            else if (bar.O.ReserveSpace) area = bar.O.Position == "bottom" ? new RectangleF(0, 0, w, h - bar.O.Height - bar.O.Margin * 2) : new RectangleF(0, bar.O.Height + bar.O.Margin * 2, w, h - bar.O.Height - bar.O.Margin * 2);
+            else (barAt, area) = bar.O.PlaceIn(new RectangleF(0, 0, w, h));
         }
         using var r = new Renderer(IntPtr.Zero, w, h);
         var fp = r.SetFont(comp.Font);
@@ -201,6 +201,7 @@ internal static class Program
         {
             var t0 = sw.Elapsed.TotalMilliseconds;
             comp.Env.Canvas = r.Canvas;
+            if (cx > -1e5f && i > 0) comp.UpdateHover(cx, cy, true);   // --cursor: hover looks and hover tweens (bounds exist after frame 1)
             comp.Compose(w, h, r.Atlas!.CellW, r.Atlas.CellH, (i + 1) / (float)fps, 1f / fps, cx, cy, area);
             composeMs += sw.Elapsed.TotalMilliseconds - t0;
             r.Draw(comp.Grid, comp.Effects, (i + 1) / (float)fps, comp.ClearColor, comp.HasBackdrop ? comp.DrawBackdrop : null, comp.Widgets.Count > 0 ? comp.DrawWidgets : null);
@@ -209,7 +210,7 @@ internal static class Program
         using var bmp = r.ReadBack();
         if (bar != null)
         {
-            int bw = w - bar.O.Margin * 2, bh = bar.O.Height;
+            int bw = (int)barAt.Width, bh = (int)barAt.Height;
             using var br = new Renderer(IntPtr.Zero, bw, bh);
             br.SetFont(bar.BarFont());
             var a = br.Atlas!;
@@ -221,7 +222,7 @@ internal static class Program
             br.Draw(grid, new EffectSettings { Enabled = false }, 0, bar.ClearColor, null, bar.PaintVector);
             using var bb = br.ReadBack();
             using var g = Graphics.FromImage(bmp);
-            g.DrawImage(bb, bar.O.Margin, bar.O.Position == "bottom" ? h - bh - bar.O.Margin : bar.O.Margin);
+            g.DrawImage(bb, barAt.X, barAt.Y);
         }
         bmp.Save(outPath, System.Drawing.Imaging.ImageFormat.Png);
         var report = $"saved {outPath}: {w}x{h}, grid {comp.Grid.W}x{comp.Grid.H}, cell {r.Atlas!.CellW}x{r.Atlas.CellH}, {frames} frames, compose {composeMs / frames:0.00} ms/frame, total {sw.Elapsed.TotalMilliseconds / frames:0.00} ms/frame";

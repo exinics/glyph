@@ -70,6 +70,27 @@ internal static class Audio
         finally { Marshal.ReleaseComObject(ep); }
     }
 
+    static IAudioEndpointVolume? kept;
+    static long keptAt;
+
+    /// Get() for the once-a-second stats: keeps the speaker's volume control for 5 s instead of finding it again
+    /// every time (that's a round of COM calls). Background threads only.
+    public static (float, bool) GetQuick()
+    {
+        lock (typeof(Audio))
+        {
+            long now = Environment.TickCount64;
+            if (kept == null || now - keptAt > 5000)
+            {
+                if (kept != null) { try { Marshal.ReleaseComObject(kept); } catch { } kept = null; }
+                kept = Endpoint(); keptAt = now;
+            }
+            if (kept == null) return (-1, false);
+            try { kept.GetMasterVolumeLevelScalar(out var v); kept.GetMute(out var m); return (v, m); }
+            catch { try { Marshal.ReleaseComObject(kept); } catch { } kept = null; return (-1, false); }
+        }
+    }
+
     public static void Set(float v)
     {
         var ep = Endpoint(); if (ep == null) return;

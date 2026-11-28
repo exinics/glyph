@@ -19,6 +19,8 @@ internal sealed class BarScene
     float width, height;
 
     public BarOptions O => File.Bar;
+    /// A side bar (smooth style): groups and rows stand in columns.
+    bool Vert => !Painter.Terminal && O.Side;
     public bool Enabled => O.Enabled;
 
     public void Load(Theme theme, List<string> problems)
@@ -69,6 +71,7 @@ internal sealed class BarScene
                 {
                     Spans = Fmt.Cut(Fmt.Spans(t.Format, Stats.Value, Theme, color), t.MaxLength), Bold = t.Bold, Background = Pill(t),
                     Size = t.Size switch { "small" => TextSize.Small, "large" => TextSize.Large, _ => TextSize.Normal }, Spacing = t.Spacing,
+                    Rotate = t.Rotate switch { "down" => 90, "up" => -90, _ => 0 },
                 };
                 break;
             case MeterModule mm:
@@ -81,7 +84,7 @@ internal sealed class BarScene
                 break;
             case IconsModule ic:
                 {
-                    var row = new RowEl { Gap = Painter.Terminal ? 1 : ic.Spacing / (Painter.FontSize * 0.5f) };
+                    var row = new RowEl { Gap = Painter.Terminal ? 1 : ic.Spacing / (Painter.FontSize * 0.5f), Vertical = Vert };
                     float size = ic.IconSize > 0 ? ic.IconSize : MathF.Round(Painter.FontSize * 1.3f);
                     var tint = new Gradient(Theme, new[] { "accent_dim", "accent", "bright" });
                     var pick = ic.Names.Length > 0
@@ -112,7 +115,7 @@ internal sealed class BarScene
                 {
                     Stats.Use();
                     var s = Stats.Now;
-                    var row = new RowEl { Gap = Painter.Terminal ? 0 : 0.4f };
+                    var row = new RowEl { Gap = Painter.Terminal ? 0 : 0.4f, Vertical = Vert };
                     var af = Painter.Terminal ? null : Theme.Frame(w.ActiveFrame);
                     var inf = Painter.Terminal ? null : Theme.Frame(w.InactiveFrame);
                     var activeText = w.ActiveText == "auto" ? Theme[O.Background] : Theme[w.ActiveText];
@@ -145,7 +148,7 @@ internal sealed class BarScene
                 }
             case TasksModule tk:
                 {
-                    var row = new RowEl { Gap = Painter.Terminal ? 1 : tk.Spacing / (Painter.FontSize * 0.5f) };
+                    var row = new RowEl { Gap = Painter.Terminal ? 1 : tk.Spacing / (Painter.FontSize * 0.5f), Vertical = Vert };
                     float size = tk.IconSize > 0 ? tk.IconSize : MathF.Round(Painter.FontSize * 1.3f);
                     var tint = new Gradient(Theme, new[] { "accent_dim", "accent", "bright" });
                     var tf = Painter.Terminal ? null : Theme.Frame(tk.TaskFrame);
@@ -189,7 +192,7 @@ internal sealed class BarScene
             case TrayModule tr:
                 {
                     Tray.Use();
-                    var row = new RowEl { Gap = Painter.Terminal ? 1 : tr.Spacing / (Painter.FontSize * 0.5f) };
+                    var row = new RowEl { Gap = Painter.Terminal ? 1 : tr.Spacing / (Painter.FontSize * 0.5f), Vertical = Vert };
                     float size = tr.IconSize > 0 ? tr.IconSize : MathF.Round(Painter.FontSize * 1.3f);
                     var tint = new Gradient(Theme, new[] { "accent_dim", "accent", "bright" });
                     var fr = Painter.Terminal ? null : Theme.Frame(tr.IconFrame);
@@ -232,8 +235,8 @@ internal sealed class BarScene
         return col;
     }
 
-    /// Height of a module frame: the bar's height less the inset (smooth style).
-    float BoxHeight() => Math.Max(0, height - 2 * O.ModuleInset - (O.BorderWidth > 0 && O.Frame == "none" ? O.BorderWidth : 0));
+    /// Height of a module frame: the bar's height (a side bar's width) less the inset (smooth style).
+    float BoxHeight() => Math.Max(0, (Vert ? width : height) - 2 * O.ModuleInset - (O.BorderWidth > 0 && O.Frame == "none" ? O.BorderWidth : 0));
 
     void Build()
     {
@@ -244,6 +247,7 @@ internal sealed class BarScene
             row.Items.Clear();
             float gapUnits = Painter.Terminal ? Math.Max(1, MathF.Round(O.Gap / (float)Painter.CellW)) : O.Gap / (Painter.FontSize * 0.5f);
             row.Gap = gapUnits;
+            row.Vertical = Vert;
             var list = lists[g];
             for (int i = 0; i < list.Count; i++)
             {
@@ -256,8 +260,10 @@ internal sealed class BarScene
                 var first = members.First(m => m.Enabled);
                 var fr = Painter.Terminal ? null : Theme.Frame(first.Frame, O.ModuleFrame);
                 if (fr == null) { row.Items.AddRange(els); continue; }
-                El body = els.Count == 1 ? els[0] : new RowEl { Gap = O.JoinGap / (Painter.FontSize * 0.5f), Items = els };
-                var box = new BoxEl { Child = body, Frame = fr, PadX = O.ModulePadding + Math.Abs(fr.Slant) * 0.5f, MinH = BoxHeight(), Tag = first };
+                El body = els.Count == 1 ? els[0] : new RowEl { Gap = O.JoinGap / (Painter.FontSize * 0.5f), Items = els, Vertical = Vert };
+                var box = Vert
+                    ? new BoxEl { Child = body, Frame = fr, PadY = O.ModulePadding, MinW = BoxHeight(), Tag = first }
+                    : new BoxEl { Child = body, Frame = fr, PadX = O.ModulePadding + Math.Abs(fr.Slant) * 0.5f, MinH = BoxHeight(), Tag = first };
                 if (els.Count == 1 && body is not RowEl && body.Clickable)
                 {
                     // the whole frame takes the clicks (and lights up)
@@ -298,6 +304,22 @@ internal sealed class BarScene
             Place(groups[2], pad, contentRow, cols - 2 * pad, "right");
             Place(groups[1], pad, contentRow, cols - 2 * pad, "center");
             Unclash(1);
+        }
+        else if (Vert)
+        {
+            // side bar: Left group at the top, Right at the bottom, Center in the middle (moved aside if it would overlap)
+            float pad = O.Padding;
+            var (_, h0) = p.Measure(groups[0]); var (_, h1) = p.Measure(groups[1]); var (_, h2) = p.Measure(groups[2]);
+            float y1 = (h - h1) / 2;
+            float top = groups[0].Items.Count > 0 ? pad + h0 + O.Gap : pad, bottom = groups[2].Items.Count > 0 ? h - pad - h2 - O.Gap : h - pad;
+            if (y1 + h1 > bottom) y1 = bottom - h1;
+            if (y1 < top) y1 = top;
+            foreach (var (g, gy, gh) in new[] { (groups[0], pad, h0), (groups[1], y1, h1), (groups[2], h - pad - h2, h2) })
+            {
+                var (mw, _) = p.Measure(g);
+                g.Align = "left";
+                p.Arrange(g, (w - mw) / 2, gy, mw);
+            }
         }
         else
         {
@@ -398,7 +420,7 @@ internal sealed class BarScene
         if (Theme.Frame(O.Frame) is { } bf)
         {
             Glyph.Render.FramePainter.Draw(c, bf, Theme, r, "", "", Painter.FontSize);
-            foreach (var grp in groups) Painter.PaintVector(grp, c, 0, 0, Theme[O.Background], O.ModuleRadius);
+            PaintModules(c);
             return;
         }
         c.Fill(r, Theme[O.Background], O.CornerRadius, O.Opacity);
@@ -407,10 +429,23 @@ internal sealed class BarScene
             if (O.CornerRadius > 0 || O.Margin > 0) c.Stroke(r, Theme[O.BorderColor], O.BorderWidth, O.CornerRadius);
             else
             {
-                float y = O.Position == "bottom" ? 0 : height - O.BorderWidth;
-                c.Fill(new RectangleF(0, y, width, O.BorderWidth), Theme[O.BorderColor]);
+                // the edge facing the desktop
+                var line = O.Position switch
+                {
+                    "bottom" => new RectangleF(0, 0, width, O.BorderWidth),
+                    "left" => new RectangleF(width - O.BorderWidth, 0, O.BorderWidth, height),
+                    "right" => new RectangleF(0, 0, O.BorderWidth, height),
+                    _ => new RectangleF(0, height - O.BorderWidth, width, O.BorderWidth),
+                };
+                c.Fill(line, Theme[O.BorderColor]);
             }
         }
-        foreach (var grp in groups) Painter.PaintVector(grp, c, 0, 0, Theme[O.Background], O.ModuleRadius);
+        PaintModules(c);
+    }
+
+    void PaintModules(Canvas c)
+    {
+        var aura = AuraLook.From(Theme, O.Halo, 0, -1, O.Glow, O.GlowSize, O.GlowStrength);
+        Aura.Draw(c, aura, () => { foreach (var grp in groups) Painter.PaintVector(grp, c, 0, 0, Theme[O.Background], O.ModuleRadius); });
     }
 }

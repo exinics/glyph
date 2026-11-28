@@ -77,6 +77,10 @@ internal sealed class Composer : IDisposable
 
     /// True while something on screen moves by itself (so frames must keep coming).
     public bool Animated => Scene.Animated || Widgets.Any(w => w.Animated) || ripples.Count > 0 || trail.Count > 0 || (Theme.Smooth && Anim.Running);
+    /// Something drawn with the widgets (smooth layer) is moving: they can't be reused from the last frame.
+    public bool OverlayMoving => Widgets.Any(w => w.Animated) || ripples.Count > 0 || trail.Count > 0 || (Theme.Smooth && Anim.Running) || selecting;
+    /// False = the widgets are known not to have changed: skip laying them out (smooth themes).
+    public bool LayoutWidgets { get; set; } = true;
 
     /// Plays the appear and loop animations again from the start (the editor's Play button).
     public void ReplayAnimations() => Anim.Restart();
@@ -162,7 +166,13 @@ internal sealed class Composer : IDisposable
         }
     }
 
-    public Rgba ClearColor => Theme[Scene.Options.Backdrop.Color];
+    public Rgba ClearColor => LiveEngine ? Theme[Scene.Options.Backdrop.Color].WithAlpha(0) : Theme[Scene.Options.Backdrop.Color];
+
+    /// The backdrop is a Wallpaper Engine wallpaper.
+    public bool UsesEngine => Scene.Options.Backdrop.Type == "wallpaper_engine";
+    /// Wallpaper Engine is drawing it under this desktop (set by the engine): the desktop is drawn see-through.
+    /// Off (previews, snapshots) = its preview picture is drawn instead.
+    public bool LiveEngine { get; set; }
 
     public void Compose(int pxW, int pxH, int cellW, int cellH, float time, float dt, float cursorPxX, float cursorPxY, RectangleF? area = null)
     {
@@ -180,7 +190,7 @@ internal sealed class Composer : IDisposable
         Anim.Step(time, dt, w => over.Contains(w) || w.MouseOver, Env.MouseX, Env.MouseY);
         Scene.Draw(frame);
         DrawInteractionCells();
-        foreach (var w in Widgets) { UseFont(w); w.Layout(Env); w.DrawCells(Grid, Env); }
+        if (LayoutWidgets || !Theme.Smooth) foreach (var w in Widgets) { UseFont(w); w.Layout(Env); w.DrawCells(Grid, Env); }
         UseFont(null);
         DrawSelectionCells();
         DrawProblems();
@@ -208,7 +218,7 @@ internal sealed class Composer : IDisposable
     {
         if (Env.Theme == null) return "";
         var sb = new System.Text.StringBuilder();
-        foreach (var w in Widgets) sb.Append(w.Signature(Env)).Append('#');
+        foreach (var w in Widgets) { var s = w.Signature(Env); w.LastSig = s; sb.Append(s).Append('#'); }
         return sb.ToString();
     }
 
@@ -229,6 +239,11 @@ internal sealed class Composer : IDisposable
         var area = new RectangleF(0, 0, Env.W, Env.H);
         if (b.Type == "gradient") c.Gradient(area, b.Colors.Select(n => Theme[n]).ToList(), b.Angle, b.Shape == "radial");
         else if (b.Type == "image" && b.File.Length > 0) c.Picture(Paths.FindAsset(b.File, Theme.Name, "images"), area, b.Fit, b.Dim);
+        else if (b.Type == "wallpaper_engine")
+        {
+            if (!LiveEngine && Glyph.Data.WallpaperEngine.Find(b.Engine) is { Preview.Length: > 0 } we && File.Exists(we.Preview)) c.Picture(we.Preview, area, "cover", b.Dim);
+            else if (LiveEngine && b.Dim > 0) c.Fill(area, new Rgba(0, 0, 0, 255), 0, b.Dim);
+        }
         if (!Theme.Smooth) return;
         if (b.Tint != "none" && b.TintAmount > 0)
         {
@@ -249,9 +264,11 @@ internal sealed class Composer : IDisposable
         get
         {
             var b = Scene.Options.Backdrop;
-            return b.Type is "gradient" || (b.Type == "image" && b.File.Length > 0) || (Theme.Smooth && (b.Pattern != "none" || b.Pattern2 != "none" || b.Tint != "none"));
+            return b.Type is "gradient" || (b.Type == "image" && b.File.Length > 0) || (b.Type == "wallpaper_engine" && (!LiveEngine || b.Dim > 0)) || (Theme.Smooth && (b.Pattern != "none" || b.Pattern2 != "none" || b.Tint != "none"));
         }
     }
+
+    readonly HashSet<string> drawErrors = new();
 
     public void DrawWidgets(Canvas c)
     {
@@ -262,7 +279,29 @@ internal sealed class Composer : IDisposable
         try
         {
             foreach (var w in Widgets.Where(w => !w.OnTop).Concat(Widgets.Where(w => w.OnTop)))
-            { UseFont(w); var ww = w; Anim.Apply(c, w, () => ww.DrawVector(c, Env)); }
+            {
+                UseFont(w); var ww = w;
+                var o = w.Opt;
+                var aura = o == null ? default : AuraLook.From(Theme, o.Halo, o.HaloSize, o.HaloStrength, o.Glow, o.GlowSize, o.GlowStrength);
+                w.Aura = aura;
+                // its kept glow picture can be reused if it shows the same and nothing about it moves
+                bool still = w.LastSig != null && !w.Animated && !Anim.Running && !(w.MouseOver && (w.FollowsMouse || (Theme.Smooth && Theme.AnySpotlight)));
+                // only widgets with a glow/halo are kept as pictures: redrawing the others costs little, keeping
+                // every widget cost 10-20 MB for almost no CPU
+                w.AuraKey = still && aura.Any ? w.LastSig + "|" + w.Bounds + "|" + w.Hover : null;
+                // panels add the halo / glow around their contents themselves (not around their glass); others whole
+                try { Anim.Apply(c, w, () => { if (ww is PanelWidget) ww.DrawVector(c, Env); else Aura.Draw(c, aura, () => ww.DrawVector(c, Env), ww, ww.AuraKey); }); }
+                catch (Exception ex)
+                {
+                    // one widget failing mustn't take the others with it
+                    var key = (w.Opt?.Name ?? w.GetType().Name) + ex.Message;
+                    if (drawErrors.Add(key)) Log.Write($"widget {w.Opt?.Type} \"{w.Opt?.Name}\" failed to draw: {ex}");
+                    try { c.Dc.Transform = System.Numerics.Matrix3x2.Identity; } catch { }
+                }
+                // several glows/halos in one batch can make Direct2D fail the whole frame (seen with ~10 of them):
+                // hand each one to the GPU on its own
+                if (aura.Any) try { c.Dc.Flush(out _, out _); } catch (Exception fx) { if (drawErrors.Add("flush" + w.Opt?.Name)) Log.Write($"widget \"{w.Opt?.Name}\" glow: {fx.Message}"); }
+            }
         }
         finally { FramePainter.Mouse = null; }
         UseFont(null);
@@ -341,6 +380,8 @@ internal sealed class Composer : IDisposable
     Widget? lastWidget; int lastItem = -1; long lastClickMs; PointF lastClickPt;
     readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
 
+    bool nearSpot;
+
     /// Updates which item is under the mouse. Returns true if that changed (needs a redraw).
     public bool UpdateHover(float x, float y, bool overDesktop)
     {
@@ -349,6 +390,15 @@ internal sealed class Composer : IDisposable
         bool hoverTweens = Anim.HasHover;
         Env.MouseX = x; Env.MouseY = y; Env.MouseOn = overDesktop;
         bool spot = Theme.Smooth && Theme.AnySpotlight;
+        // a spotlight also lights a box's edge from just outside it: redraw while the mouse is that near any
+        // widget (and once more when it leaves, to take the glow away), not only while it's on one
+        if (spot)
+        {
+            float reach = Theme.SpotlightReach;
+            bool near = overDesktop && Widgets.Any(w => !w.Bounds.IsEmpty && RectangleF.Inflate(w.Bounds, reach, reach).Contains(x, y));
+            if (near || nearSpot) changed = true;
+            nearSpot = near;
+        }
         foreach (var w in Widgets)
         {
             int h = overDesktop ? w.HitTest(x, y) : -1;

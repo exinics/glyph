@@ -86,7 +86,8 @@ internal sealed class Canvas : IDisposable
         }
         var key = $"{font}|{size}|{bold}|{align}|{wrap}";
         if (formats.TryGetValue(key, out var f)) return f;
-        f = dw.CreateTextFormat(font, Fonts.Collection(dw), bold ? FontWeight.SemiBold : FontWeight.Normal, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, size, "en-us");
+        var (family, weight) = Fonts.Resolve(dw, font);
+        f = dw.CreateTextFormat(family, Fonts.Collection(dw), weight ?? (bold ? FontWeight.SemiBold : FontWeight.Normal), Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, size, "en-us");
         f.TextAlignment = align switch { "center" => TextAlignment.Center, "right" => TextAlignment.Trailing, _ => TextAlignment.Leading };
         f.ParagraphAlignment = ParagraphAlignment.Near;
         f.WordWrapping = wrap ? WordWrapping.Wrap : WordWrapping.NoWrap;
@@ -102,6 +103,8 @@ internal sealed class Canvas : IDisposable
         s = Symbols.Expand(s);
         if (s.Length == 0) return;
         var f = Format(font, size, bold, align, wrap);
+        // a box exactly as wide as the measured text can still cut it to "…" (rounding in DirectWrite): a pixel of room
+        if (!wrap && align == "left") r = new RectangleF(r.X, r.Y, r.Width + 1.5f, r.Height);
         Dc.PushAxisAlignedClip(new Rect(r.X, r.Y, r.Width, r.Height), AntialiasMode.Aliased);
         if (Symbols.HasIcon(s))
         {
@@ -187,9 +190,14 @@ internal sealed class Canvas : IDisposable
     public void Picture(string path, RectangleF area, string fit, float dim)
     {
         if (!File.Exists(path)) return;
-        var key = "img|" + path + "|" + File.GetLastWriteTimeUtc(path).Ticks;
-        var bmp = Bitmap(key, () => LoadPremultiplied(path));
+        var size = PictureSize(path);
+        float need = fit switch { "contain" => Math.Min(area.Width / Math.Max(1, size.Width), area.Height / Math.Max(1, size.Height)), "center" or "stretch" => 1f, _ => Math.Max(area.Width / Math.Max(1, size.Width), area.Height / Math.Max(1, size.Height)) };
+        float shrink = fit == "stretch" ? Math.Max(area.Width / Math.Max(1, size.Width), area.Height / Math.Max(1, size.Height)) : need;
+        int lw = shrink < 0.95f ? Math.Max(1, (int)MathF.Ceiling(size.Width * shrink)) : size.Width, lh = shrink < 0.95f ? Math.Max(1, (int)MathF.Ceiling(size.Height * shrink)) : size.Height;
+        var key = "img|" + path + "|" + File.GetLastWriteTimeUtc(path).Ticks + "|" + lw + "x" + lh;
+        var bmp = Bitmap(key, () => LoadPremultiplied(path, lw, lh));
         var (_, w, h) = bitmaps[key];
+        if (w != size.Width && size.Width > 0) { w = size.Width; h = size.Height; }   // place it as the full picture
         float sx = area.Width / w, sy = area.Height / h;
         float s = fit switch { "contain" => Math.Min(sx, sy), "center" => 1f, "stretch" => 1f, _ => Math.Max(sx, sy) };
         RectangleF dest = fit == "stretch" ? area : new RectangleF(area.X + (area.Width - w * s) / 2, area.Y + (area.Height - h * s) / 2, w * s, h * s);
@@ -197,12 +205,37 @@ internal sealed class Canvas : IDisposable
         if (dim > 0) Fill(area, new Rgba(0, 0, 0), 0, dim);
     }
 
-    static unsafe (byte[], int, int) LoadPremultiplied(string path)
+    static readonly Dictionary<string, System.Drawing.Size> pictureSizes = new();
+
+    /// A picture's size without decoding it all (cached).
+    static System.Drawing.Size PictureSize(string path)
+    {
+        if (pictureSizes.TryGetValue(path, out var s)) return s;
+        try { using var fs = File.OpenRead(path); using var img = Image.FromStream(fs, false, false); s = img.Size; }
+        catch { s = new System.Drawing.Size(1, 1); }
+        pictureSizes[path] = s;
+        return s;
+    }
+
+    /// Decodes a picture to premultiplied pixels, scaled to w x h (its own size if 0).
+    static unsafe (byte[], int, int) LoadPremultiplied(string path, int w = 0, int h = 0)
     {
         using var fs = File.OpenRead(path);
         using var img = Image.FromStream(fs);
-        using var bmp = new Bitmap(img.Width, img.Height, PixelFormat.Format32bppPArgb);
-        using (var g = Graphics.FromImage(bmp)) g.DrawImage(img, 0, 0, img.Width, img.Height);
+        if (w <= 0 || h <= 0) { w = img.Width; h = img.Height; }
+        using var bmp = new Bitmap(w, h, PixelFormat.Format32bppPArgb);
+        using (var g = Graphics.FromImage(bmp))
+        {
+            if (w != img.Width || h != img.Height)
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                using var ia = new System.Drawing.Imaging.ImageAttributes();
+                ia.SetWrapMode(System.Drawing.Drawing2D.WrapMode.TileFlipXY);   // no dark fringe at the edges
+                g.DrawImage(img, new Rectangle(0, 0, w, h), 0, 0, img.Width, img.Height, GraphicsUnit.Pixel, ia);
+            }
+            else g.DrawImage(img, 0, 0, img.Width, img.Height);
+        }
         var data = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);
         var px = new byte[bmp.Width * bmp.Height * 4];
         for (int y = 0; y < bmp.Height; y++)
@@ -237,8 +270,15 @@ internal sealed class Canvas : IDisposable
     }
 
     /// Forget cached pictures and fonts (after a theme change).
+    readonly Dictionary<object, Aura.Kept> kept = new();
+    /// The kept glow/halo picture of a widget (see Aura.Draw).
+    public Aura.Kept KeptFor(object owner) { if (!kept.TryGetValue(owner, out var k)) kept[owner] = k = new Aura.Kept(); return k; }
+    public void ForgetKept(object owner) { if (kept.Remove(owner, out var k)) k.Dispose(); }
+
     public void Reset()
     {
+        foreach (var k in kept.Values) k.Dispose();
+        kept.Clear();
         foreach (var b in bitmaps.Values) b.bmp.Dispose();
         bitmaps.Clear();
         foreach (var f in formats.Values) f.Dispose();

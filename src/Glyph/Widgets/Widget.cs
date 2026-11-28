@@ -34,6 +34,9 @@ internal abstract class Widget : IDisposable
     public RectangleF Bounds;      // pixels, worked out by Layout
     public int Hover = -1;          // item under the mouse
     public bool MouseOver;          // the mouse is over the widget (anywhere on it)
+    public Glyph.Render.AuraLook Aura;   // halo / glow for this frame (panels put it around their contents only)
+    public string? LastSig;              // what it showed at the last check (Composer.Signature)
+    public string? AuraKey;              // set when its glow picture may be reused this frame (null = draw afresh)
     /// Drawn after the others this frame (e.g. a panel growing to show more under the mouse).
     public virtual bool OnTop => false;
     /// True if it changes as the mouse moves over it (tilt that follows the mouse, spotlights, magnifying icons):
@@ -108,6 +111,9 @@ internal abstract class Widget : IDisposable
         DividerOptions dv => new DividerWidget(dv, theme),
         ThemesOptions th => new ThemesWidget(th, theme),
         TogglesOptions tg => new TogglesWidget(tg, theme),
+        ListOptions li => new ListWidget(li, theme),
+        LyricsOptions ly => new LyricsWidget(ly, theme),
+        VisualiserOptions vi => new VisualiserWidget(vi, theme),
         _ => throw new ArgumentException("unknown widget " + o.Type),
     };
 }

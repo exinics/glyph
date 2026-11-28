@@ -99,8 +99,35 @@ internal sealed class BarFile
 internal sealed class BarOptions
 {
     [Category("Bar"), Description("Show the bar.")] public bool Enabled { get; set; } = true;
-    [Category("Bar"), Description("Top or bottom of the screen."), Choices("top", "bottom"), TypeConverter(typeof(ChoicesConverter))] public string Position { get; set; } = "top";
-    [Category("Bar"), Description("Height in pixels (terminal themes round this to whole rows of characters)."), Range(10, 200)] public int Height { get; set; } = 34;
+    [Category("Bar"), Description("Which edge of the screen. left / right = a side bar (smooth themes): the Left modules go at its top, Center in the middle, Right at the bottom, and rows of icons stand in columns."), Choices("top", "bottom", "left", "right"), TypeConverter(typeof(ChoicesConverter))] public string Position { get; set; } = "top";
+    /// A side bar (left or right edge) instead of a strip along the top or bottom.
+    public bool Side => Position is "left" or "right";
+    /// Where the bar goes in `area` (pixels), and what's left of the area if it reserves space.
+    public (RectangleF bar, RectangleF rest) PlaceIn(RectangleF area)
+    {
+        float t = Height, m = Margin, strip = t + 2 * m;
+        RectangleF bar = Position switch
+        {
+            "bottom" => new(area.X + m, area.Bottom - m - t, area.Width - 2 * m, t),
+            "left" => new(area.X + m, area.Y + m, t, area.Height - 2 * m),
+            "right" => new(area.Right - m - t, area.Y + m, t, area.Height - 2 * m),
+            _ => new(area.X + m, area.Y + m, area.Width - 2 * m, t),
+        };
+        if (!ReserveSpace) return (bar, area);
+        RectangleF rest = Position switch
+        {
+            "bottom" => new(area.X, area.Y, area.Width, area.Height - strip),
+            "left" => new(area.X + strip, area.Y, area.Width - strip, area.Height),
+            "right" => new(area.X, area.Y, area.Width - strip, area.Height),
+            _ => new(area.X, area.Y + strip, area.Width, area.Height - strip),
+        };
+        return (bar, rest);
+    }
+    [Category("Bar"), Description("Height in pixels (terminal themes round this to whole rows of characters). For a side bar: its width."), Range(10, 400)] public int Height { get; set; } = 34;
+    [Category("Glow & halo"), DisplayName("Halo"), Description("Smooth style: a soft blur of this colour behind the bar's modules. auto = the theme's, none = off."), Color, TypeConverter(typeof(ColorNameConverter))] public string Halo { get; set; } = "none";
+    [Category("Glow & halo"), DisplayName("Glow"), Description("Smooth style: the modules light up: self = in their own colours, a colour, auto = the theme's, none = off."), TypeConverter(typeof(GlowNameConverter))] public string Glow { get; set; } = "none";
+    [Category("Glow & halo"), DisplayName("Glow size"), Description("Pixels. 0 = the theme's."), Range(0, 80)] public float GlowSize { get; set; }
+    [Category("Glow & halo"), DisplayName("Glow strength"), Description("-1 = the theme's."), Range(-1, 3)] public float GlowStrength { get; set; } = -1;
     [Category("Bar"), DisplayName("Reserve space"), Description("Windows (and maximised windows) stop at the bar instead of going under it.")] public bool ReserveSpace { get; set; } = true;
     [Category("Bar"), Description("Gap between the bar and the screen edges, in pixels. Above 0 the bar floats."), Range(0, 200)] public int Margin { get; set; }
     [Category("Look"), DisplayName("Corner radius"), Description("Round the bar's corners (pixels). Looks best with a margin."), Range(0, 100)] public float CornerRadius { get; set; }
@@ -154,6 +181,7 @@ internal sealed class TextModule : BarModuleOptions
     [Category("Text"), DisplayName("Hide when empty"), Description("Hide the module when all its values are empty (e.g. media with nothing playing).")] public bool HideWhenEmpty { get; set; } = true;
     [Category("Text"), Description("Text size (smooth style)."), Choices("small", "normal", "large"), TypeConverter(typeof(ChoicesConverter))] public string Size { get; set; } = "normal";
     [Category("Text"), DisplayName("Letter spacing"), Description("Smooth style: extra pixels between letters."), Range(-5, 50)] public float Spacing { get; set; }
+    [Category("Text"), Description("Smooth style: turn the text on its side (for a side bar): down = reads top to bottom, up = bottom to top. none = flat."), Choices("none", "down", "up"), TypeConverter(typeof(ChoicesConverter))] public string Rotate { get; set; } = "none";
     public override string ToString() => Format.Length > 40 ? Format[..40] + "…" : Format;
 }
 

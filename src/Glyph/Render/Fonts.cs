@@ -84,6 +84,28 @@ internal static class Fonts
 
     public static bool Has(IDWriteFactory dw, string family) => Collection(dw).FindFamilyName(family, out _);
 
+    static readonly (string word, FontWeight weight)[] WeightWords =
+    {
+        ("ExtraLight", FontWeight.ExtraLight), ("Extra Light", FontWeight.ExtraLight), ("UltraLight", FontWeight.ExtraLight), ("Thin", FontWeight.Thin),
+        ("Light", FontWeight.Light), ("Regular", FontWeight.Normal), ("Medium", FontWeight.Medium), ("SemiBold", FontWeight.SemiBold), ("Semi Bold", FontWeight.SemiBold),
+        ("DemiBold", FontWeight.SemiBold), ("ExtraBold", FontWeight.ExtraBold), ("Extra Bold", FontWeight.ExtraBold), ("UltraBold", FontWeight.ExtraBold),
+        ("Bold", FontWeight.Bold), ("Black", FontWeight.Black), ("Heavy", FontWeight.Heavy),
+    };
+
+    /// A font name as a family and a weight. Newer fonts (e.g. Google Fonts' static files) put every weight in one
+    /// family ("Rubik"), so a name like "Rubik Black" becomes family "Rubik", weight Black. null = use the default.
+    public static (string family, FontWeight? weight) Resolve(IDWriteFactory dw, string name)
+    {
+        if (name.Length == 0 || Has(dw, name)) return (name, null);
+        foreach (var (word, weight) in WeightWords)
+            if (name.EndsWith(" " + word, StringComparison.OrdinalIgnoreCase))
+            {
+                var fam = name[..^(word.Length + 1)].Trim();
+                if (Has(dw, fam)) return (fam, weight);
+            }
+        return (name, null);
+    }
+
     /// Every font family Glyph can use, A to Z (for the settings window's font lists).
     public static List<string> FamilyNames()
     {

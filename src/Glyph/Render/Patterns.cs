@@ -15,17 +15,37 @@ internal static class Patterns
         var dc = c.Dc;
         var br = c.Brush(color, opacity);
         float sp = Math.Max(2, spacing), s = Math.Clamp(size, 0.5f, sp);
+        // everything goes into one geometry, filled once: hundreds of separate rectangles are slow, and inside a
+        // glow or halo (a command list fed to an effect) that many primitives makes Direct2D fail the whole frame
+        using var path = dc.Factory.CreatePathGeometry();
+        var sink = path.Open();
+        sink.SetFillMode(Vortice.Direct2D1.FillMode.Winding);
+        void Box(Rect q)
+        {
+            sink.BeginFigure(new Vector2(q.Left, q.Top), Vortice.Direct2D1.FigureBegin.Filled);
+            sink.AddLine(new Vector2(q.Right, q.Top)); sink.AddLine(new Vector2(q.Right, q.Bottom)); sink.AddLine(new Vector2(q.Left, q.Bottom));
+            sink.EndFigure(Vortice.Direct2D1.FigureEnd.Closed);
+        }
+        void Line(Vector2 a, Vector2 b)
+        {
+            // a thin parallelogram along the line, `s` wide
+            var dir = Vector2.Normalize(b - a);
+            var n = new Vector2(-dir.Y, dir.X) * (s / 2);
+            sink.BeginFigure(a + n, Vortice.Direct2D1.FigureBegin.Filled);
+            sink.AddLine(b + n); sink.AddLine(b - n); sink.AddLine(a - n);
+            sink.EndFigure(Vortice.Direct2D1.FigureEnd.Closed);
+        }
         switch (kind)
         {
-            case "scanlines": for (float y = r.Y; y < r.Bottom; y += sp) dc.FillRectangle(new Rect(r.X, y, r.Width, s), br); break;
-            case "vlines": for (float x = r.X; x < r.Right; x += sp) dc.FillRectangle(new Rect(x, r.Y, s, r.Height), br); break;
+            case "scanlines": for (float y = r.Y; y < r.Bottom; y += sp) Box(new Rect(r.X, y, r.Width, s)); break;
+            case "vlines": for (float x = r.X; x < r.Right; x += sp) Box(new Rect(x, r.Y, s, r.Height)); break;
             case "grid":
-                for (float y = r.Y; y < r.Bottom; y += sp) dc.FillRectangle(new Rect(r.X, y, r.Width, s), br);
-                for (float x = r.X; x < r.Right; x += sp) dc.FillRectangle(new Rect(x, r.Y, s, r.Height), br);
+                for (float y = r.Y; y < r.Bottom; y += sp) Box(new Rect(r.X, y, r.Width, s));
+                for (float x = r.X; x < r.Right; x += sp) Box(new Rect(x, r.Y, s, r.Height));
                 break;
             case "dots":
                 for (float y = r.Y + sp / 2; y < r.Bottom; y += sp)
-                    for (float x = r.X + sp / 2; x < r.Right; x += sp) dc.FillRectangle(new Rect(x, y, s, s), br);
+                    for (float x = r.X + sp / 2; x < r.Right; x += sp) Box(new Rect(x, y, s, s));
                 break;
             case "crosses":
                 {
@@ -33,8 +53,8 @@ internal static class Patterns
                     for (float y = r.Y + sp / 2; y < r.Bottom; y += sp)
                         for (float x = r.X + sp / 2; x < r.Right; x += sp)
                         {
-                            dc.FillRectangle(new Rect(x - arm, y, arm * 2 + 1, 1), br);
-                            dc.FillRectangle(new Rect(x, y - arm, 1, arm * 2 + 1), br);
+                            Box(new Rect(x - arm, y, arm * 2 + 1, 1));
+                            Box(new Rect(x, y - arm, 1, arm * 2 + 1));
                         }
                     break;
                 }
@@ -42,10 +62,13 @@ internal static class Patterns
             case "crosshatch":
                 for (float d = -r.Height; d < r.Width; d += sp)
                 {
-                    dc.DrawLine(new Vector2(r.X + d, r.Bottom), new Vector2(r.X + d + r.Height, r.Y), br, s);
-                    if (kind == "crosshatch") dc.DrawLine(new Vector2(r.X + d, r.Y), new Vector2(r.X + d + r.Height, r.Bottom), br, s);
+                    Line(new Vector2(r.X + d, r.Bottom), new Vector2(r.X + d + r.Height, r.Y));
+                    if (kind == "crosshatch") Line(new Vector2(r.X + d, r.Y), new Vector2(r.X + d + r.Height, r.Bottom));
                 }
                 break;
         }
+        sink.Close();
+        sink.Dispose();
+        dc.FillGeometry(path, br);
     }
 }

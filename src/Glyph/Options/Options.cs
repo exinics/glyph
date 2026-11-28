@@ -247,6 +247,14 @@ internal sealed class ColorNameConverter : StringConverter
 }
 
 /// Drop-down of the theme's frames (frames.toml).
+/// Palette colour names plus self (glow in each thing's own colours), none and auto.
+internal sealed class GlowNameConverter : StringConverter
+{
+    public override bool GetStandardValuesSupported(ITypeDescriptorContext? c) => true;
+    public override bool GetStandardValuesExclusive(ITypeDescriptorContext? c) => false;
+    public override StandardValuesCollection GetStandardValues(ITypeDescriptorContext? c) => new(ColorNameConverter.Names.Prepend("self").Distinct().ToArray());
+}
+
 internal sealed class FrameNameConverter : StringConverter
 {
     public static string[] Names = { "none", "auto" };

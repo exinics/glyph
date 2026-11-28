@@ -96,7 +96,8 @@ internal static class Media
         catch { }
     }
 
-    static double Position => Playing ? Math.Min(lenSeconds, posSeconds + (DateTime.UtcNow - posAt).TotalSeconds) : posSeconds;
+    public static double Length => lenSeconds;
+    public static double Position => Playing ? Math.Min(lenSeconds, posSeconds + (DateTime.UtcNow - posAt).TotalSeconds) : posSeconds;
     public static float Progress { get { Use(); return lenSeconds > 0 ? (float)Math.Clamp(Position / lenSeconds, 0, 1) : 0f; } }
 
     public static string? Value(string name, string spec)

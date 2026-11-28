@@ -148,6 +148,11 @@ internal sealed class Animator
 
     readonly List<Live> live = new();
     IReadOnlyList<Widget> all = Array.Empty<Widget>();
+    // Groups: a widget whose Tilt around names another widget (its host) is part of the host's surface, so the
+    // host's tweens move, size, turn, tilt and fade it too (a tween already playing on it isn't added twice).
+    readonly Dictionary<Widget, Widget> hostOf = new();
+    readonly Dictionary<Widget, List<Widget>> members = new();
+    readonly Dictionary<TweenOptions, HashSet<Widget>> targets = new();
     float startAt = -1, now;
     public bool Running { get; private set; }
     public bool HasHover => live.Any(l => l.T.Trigger == "hover");
@@ -165,7 +170,7 @@ internal sealed class Animator
         bound = sig;
         float keepStart = startAt;
         all = widgets;
-        live.Clear();
+        live.Clear(); targets.Clear(); hostOf.Clear(); members.Clear();
         foreach (var t in tweens)
         {
             var target = t.Target.Trim();
@@ -178,8 +183,22 @@ internal sealed class Animator
                 bool hit = target == "*"
                     || (target.StartsWith("type:", StringComparison.OrdinalIgnoreCase) && o.Type.Equals(target[5..].Trim(), StringComparison.OrdinalIgnoreCase))
                     || (o.Name.Length > 0 && o.Name.Equals(target, StringComparison.OrdinalIgnoreCase));
-                if (hit) live.Add(new Live { T = t, W = w, Index = i++ });
+                if (hit)
+                {
+                    live.Add(new Live { T = t, W = w, Index = i++ });
+                    if (!targets.TryGetValue(t, out var set)) targets[t] = set = new();
+                    set.Add(w);
+                }
             }
+        }
+        foreach (var w in widgets)
+        {
+            if (w.Opt is not { TiltAround.Length: > 0 } wo) continue;
+            var host = widgets.FirstOrDefault(x => x != w && x.Opt != null && x.Opt.Name.Equals(wo.TiltAround.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (host == null) continue;
+            hostOf[w] = host;
+            if (!members.TryGetValue(host, out var ms)) members[host] = ms = new();
+            ms.Add(w);
         }
         Restart();
         if (same && keepStart >= 0) startAt = keepStart;   // carry on where it was (intros stay finished)
@@ -198,13 +217,15 @@ internal sealed class Animator
         now = time;
         if (startAt < 0) startAt = time;
         bool running = false;
+        // the mouse over any widget of a group counts as over its host (the cards on a panel are part of it)
+        bool Over(Widget w) => over(w) || (members.TryGetValue(w, out var ms) && ms.Any(over));
         // Tilt to mouse: lean towards the mouse while it's over the widget, eased, back to flat after
         foreach (var w in all)
         {
             float f = w.Opt?.TiltFollow ?? 0;
             if (f <= 0) { follow.Remove(w); continue; }
             float tx = 0, ty = 0;
-            if (over(w) && !w.Bounds.IsEmpty)
+            if (Over(w) && !w.Bounds.IsEmpty)
             {
                 float nx = Math.Clamp((mouseX - (w.Bounds.X + w.Bounds.Width / 2)) / Math.Max(1, w.Bounds.Width / 2), -1, 1);
                 float ny = Math.Clamp((mouseY - (w.Bounds.Y + w.Bounds.Height / 2)) / Math.Max(1, w.Bounds.Height / 2), -1, 1);
@@ -225,7 +246,7 @@ internal sealed class Animator
             {
                 case "hover":
                     {
-                        float target = over(l.W) ? 1 : 0;
+                        float target = Over(l.W) ? 1 : 0;
                         if (l.Hover != target)
                         {
                             float step = dt / Math.Max(0.01f, t.Time);
@@ -276,28 +297,50 @@ internal sealed class Animator
         }
     }
 
-    public readonly record struct Look(float X, float Y, float Scale, float Rotate, float Opacity, float TiltX, float TiltY, float Depth);
-
-    /// The widget's look now: its own Transform options plus every tween playing on it.
-    public Look For(Widget w)
+    /// HostX..HostRotate: the move, size and turn its host's tweens give it (around Pivot, the host's middle).
+    public readonly record struct Look(float X, float Y, float Scale, float Rotate, float Opacity, float TiltX, float TiltY, float Depth,
+                                       float HostX = 0, float HostY = 0, float HostScale = 1, float HostRotate = 0, Vector2 Pivot = default)
     {
-        var o = w.Opt;
-        float x = 0, y = 0, s = 1, r = o?.Rotate ?? 0, a = o?.Alpha ?? 1, tx = o?.TiltX ?? 0, ty = o?.TiltY ?? 0;
-        float baseTx = tx, baseTy = ty;
+        public bool HostMoved => HostX != 0 || HostY != 0 || HostScale != 1 || HostRotate != 0;
+    }
+
+    struct Sum { public float X, Y, S, R, A, Tx, Ty, Untilt; }
+
+    /// Adds up the tweens playing on `src` now. `member` set = only those that don't also play on that member.
+    Sum Add(Widget src, Widget? member)
+    {
+        var sum = new Sum { S = 1, A = 1 };
         foreach (var l in live)
         {
-            if (l.W != w) continue;
+            if (l.W != src) continue;
+            if (member != null && targets.TryGetValue(l.T, out var set) && set.Contains(member)) continue;
             float p = Progress(l);
             if (p == 0) continue;
             var t = l.T;
-            x += t.MoveX * p; y += t.MoveY * p; r += t.Rotate * p;
-            s *= 1 + (t.Scale - 1) * p;
-            a *= Math.Clamp(1 + (t.Opacity - 1) * p, 0, 1);
-            tx += t.TiltX * p; ty += t.TiltY * p;
-            if (t.Untilt) { tx -= baseTx * p; ty -= baseTy * p; }
+            sum.X += t.MoveX * p; sum.Y += t.MoveY * p; sum.R += t.Rotate * p;
+            sum.S *= 1 + (t.Scale - 1) * p;
+            sum.A *= Math.Clamp(1 + (t.Opacity - 1) * p, 0, 1);
+            sum.Tx += t.TiltX * p; sum.Ty += t.TiltY * p;
+            if (t.Untilt) sum.Untilt += p;
         }
+        return sum;
+    }
+
+    /// The widget's look now: its own Transform options plus every tween playing on it (and on its host).
+    public Look For(Widget w)
+    {
+        var o = w.Opt;
+        float baseTx = o?.TiltX ?? 0, baseTy = o?.TiltY ?? 0;
+        var own = Add(w, null);
+        var host = hostOf.TryGetValue(w, out var h) ? h : null;
+        var hs = host != null ? Add(host, w) : new Sum { S = 1, A = 1 };
+        float untilt = Math.Min(1, own.Untilt + hs.Untilt);
+        float tx = baseTx * (1 - untilt) + own.Tx + hs.Tx, ty = baseTy * (1 - untilt) + own.Ty + hs.Ty;
         if (follow.TryGetValue(w, out var fv)) { tx += fv.x; ty += fv.y; }
-        return new Look(x, y, s, r, a, tx, ty, o?.Depth ?? 1600);
+        if (host != null && follow.TryGetValue(host, out var hf)) { tx += hf.x; ty += hf.y; }
+        var pivot = host != null && !host.Bounds.IsEmpty ? new Vector2(host.Bounds.X + host.Bounds.Width / 2, host.Bounds.Y + host.Bounds.Height / 2) : default;
+        return new Look(own.X, own.Y, own.S, (o?.Rotate ?? 0) + own.R, (o?.Alpha ?? 1) * own.A * hs.A, tx, ty, o?.Depth ?? 1600,
+                        hs.X, hs.Y, hs.S, hs.R, pivot);
     }
 
     /// Draws `draw` with the widget's animated look applied (transform and opacity layer).
@@ -312,9 +355,13 @@ internal sealed class Animator
         var t0 = dc.Transform;
         var b = w.Bounds;
         var centre = new Vector2(b.X + b.Width / 2, b.Y + b.Height / 2);
-        if (moved)
-            dc.Transform = Matrix3x2.CreateTranslation(-centre) * Matrix3x2.CreateScale(Math.Max(0.001f, lk.Scale)) * Matrix3x2.CreateRotation(lk.Rotate * MathF.PI / 180)
-                           * Matrix3x2.CreateTranslation(centre + new Vector2(lk.X, lk.Y)) * t0;
+        static Matrix3x2 Around(Vector2 at, float scale, float rotate, float x, float y) =>
+            Matrix3x2.CreateTranslation(-at) * Matrix3x2.CreateScale(Math.Max(0.001f, scale)) * Matrix3x2.CreateRotation(rotate * MathF.PI / 180)
+            * Matrix3x2.CreateTranslation(at + new Vector2(x, y));
+        // its own tweens around its own middle, then its host's around the host's middle (one surface)
+        var hostM = lk.HostMoved ? Around(lk.Pivot, lk.HostScale, lk.HostRotate, lk.HostX, lk.HostY) : Matrix3x2.Identity;
+        if (moved || lk.HostMoved)
+            dc.Transform = (moved ? Around(centre, lk.Scale, lk.Rotate, lk.X, lk.Y) : Matrix3x2.Identity) * hostM * t0;
         bool fade = o < 0.999f;
         void Fade() => dc.PushLayer(new Vortice.Direct2D1.LayerParameters1
         {
@@ -344,7 +391,7 @@ internal sealed class Animator
                 var host = all.FirstOrDefault(x => x.Opt != null && x.Opt.Name.Equals(wo.TiltAround, StringComparison.OrdinalIgnoreCase));
                 if (host != null && !host.Bounds.IsEmpty) around = new Vector2(host.Bounds.X + host.Bounds.Width / 2, host.Bounds.Y + host.Bounds.Height / 2);
             }
-            var origin = Vector2.Transform(around + new Vector2(lk.X, lk.Y), t0);
+            var origin = Vector2.Transform(Vector2.Transform(around, hostM) + new Vector2(lk.X, lk.Y), t0);
             using var fx = new Vortice.Direct2D1.Effects.PerspectiveTransform3D(dc);
             fx.SetInput(0, list, true);
             fx.Depth = Math.Max(100, lk.Depth) * Math.Max(0.25f, t0.M11);

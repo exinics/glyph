@@ -99,12 +99,8 @@ internal sealed class Preview : IDisposable
                 var bo = bar.O;
                 if (bar.Enabled)
                 {
-                    int strip = bo.Height + bo.Margin * 2;
-                    bool top = bo.Position != "bottom";
-                    float by = top ? area.Y + bo.Margin : area.Bottom - bo.Margin - bo.Height;
                     info.BarOn = true;
-                    info.BarRect = new RectangleF(bo.Margin, by, W - bo.Margin * 2, bo.Height);
-                    if (bo.ReserveSpace) { if (top) area.Y += strip; area.Height -= strip; }
+                    (info.BarRect, area) = bo.PlaceIn(area);
                 }
                 info.Area = area;
 

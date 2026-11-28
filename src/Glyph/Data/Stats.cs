@@ -56,6 +56,10 @@ internal static class Stats
 
     static void Push(Queue<float> q, float v) { q.Enqueue(v); while (q.Count > HistoryLength) q.Dequeue(); }
 
+    static NetworkInterface[]? nics;
+    static DateTime nicsAt, diskAt;
+    static ulong diskTotal, diskFree;
+
     static void SampleNow()
     {
         try
@@ -69,19 +73,35 @@ internal static class Stats
             }
             var m = new MEMORYSTATUSEX { Length = (uint)Marshal.SizeOf<MEMORYSTATUSEX>() };
             if (GlobalMemoryStatusEx(ref m)) { s.RamTotal = m.TotalPhys; s.RamUsed = m.TotalPhys - m.AvailPhys; s.Ram = m.MemoryLoad; }
-            try
+            var now = DateTime.UtcNow;
+            // the disk barely changes: looked at every 10 s
+            if ((now - diskAt).TotalSeconds >= 10)
             {
-                var d = new DriveInfo(diskDrive);
-                if (d.IsReady) { s.DiskTotal = (ulong)d.TotalSize; s.DiskFree = (ulong)d.AvailableFreeSpace; s.Disk = 100f * (1 - (float)d.AvailableFreeSpace / d.TotalSize); }
+                diskAt = now;
+                try
+                {
+                    var d = new DriveInfo(diskDrive);
+                    if (d.IsReady) { diskTotal = (ulong)d.TotalSize; diskFree = (ulong)d.AvailableFreeSpace; }
+                }
+                catch { }
             }
-            catch { }
-            long rx = 0, tx = 0;
-            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            s.DiskTotal = diskTotal; s.DiskFree = diskFree; s.Disk = diskTotal > 0 ? 100f * (1 - (float)diskFree / diskTotal) : 0;
+            // the list of network adapters is slow to get: kept for 15 s, only their counters are read each second
+            if (nics == null || (now - nicsAt).TotalSeconds >= 15)
             {
-                if (ni.OperationalStatus != OperationalStatus.Up || ni.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel) continue;
+                nicsAt = now;
+                try
+                {
+                    nics = NetworkInterface.GetAllNetworkInterfaces()
+                        .Where(ni => ni.OperationalStatus == OperationalStatus.Up && ni.NetworkInterfaceType is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)).ToArray();
+                }
+                catch { nics = Array.Empty<NetworkInterface>(); }
+            }
+            long rx = 0, tx = 0;
+            foreach (var ni in nics)
+            {
                 try { var st = ni.GetIPStatistics(); rx += st.BytesReceived; tx += st.BytesSent; } catch { }
             }
-            var now = DateTime.UtcNow;
             if (lastNet != default)
             {
                 double secs = Math.Max(0.2, (now - lastNet).TotalSeconds);
@@ -90,7 +110,7 @@ internal static class Stats
             lastRx = rx; lastTx = tx; lastNet = now;
             if (Native.GetSystemPowerStatus(out var ps) && ps.BatteryFlag != 128 && ps.BatteryLifePercent != 255)
             { s.HasBattery = true; s.Battery = ps.BatteryLifePercent; s.Charging = ps.ACLineStatus == 1; }
-            var (vol, muted) = Audio.Get();
+            var (vol, muted) = Audio.GetQuick();
             s.Volume = vol; s.Muted = muted;
             (s.Desktop, s.Desktops, s.DesktopName) = VirtualDesktops.Current();
 
@@ -103,6 +123,31 @@ internal static class Stats
     }
 
     // ---------------- static facts ----------------
+
+    /// Windows' build number with its update revision (e.g. 26200.7171), like a kernel version.
+    static readonly Lazy<string> osBuild = new(() =>
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+            var b = k?.GetValue("CurrentBuild") as string ?? "";
+            var ubr = k?.GetValue("UBR");
+            return ubr != null ? $"{b}.{ubr}" : b;
+        }
+        catch { return Environment.OSVersion.Version.ToString(); }
+    });
+
+    /// When Windows was installed (for {os_age}); null if unknown.
+    static readonly Lazy<DateTime?> installed = new(() =>
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+            if (k?.GetValue("InstallDate") is int secs) return DateTimeOffset.FromUnixTimeSeconds((uint)secs).LocalDateTime;
+        }
+        catch { }
+        return null;
+    });
 
     static readonly Lazy<string> os = new(() =>
     {
@@ -143,6 +188,14 @@ internal static class Stats
             case "cpu_name": return cpuName.Value;
             case "gpu_name": return gpuName.Value;
             case "uptime": return Fmt.Duration(TimeSpan.FromMilliseconds(Environment.TickCount64));
+            case "os_build": case "kernel": return osBuild.Value;
+            case "installed": return installed.Value is DateTime d ? d.ToString(spec.Length > 0 ? spec : "d MMM yyyy", CultureInfo.CurrentCulture) : "";
+            case "os_age": return installed.Value is DateTime d2 ? Fmt.Duration(DateTime.Now - d2) : "";
+            case "resolution": { var b = System.Windows.Forms.Screen.PrimaryScreen?.Bounds ?? default; return $"{b.Width}×{b.Height}"; }
+            case "refresh": return Glyph.Desktop.Screens.All().FirstOrDefault(x => x.Primary) is { } ps ? Glyph.Desktop.Screens.RefreshRate(ps) + " Hz" : "";
+            case "cores": return Environment.ProcessorCount.ToString(CultureInfo.InvariantCulture);
+            case "disk_fs": try { return new DriveInfo(Environment.GetFolderPath(Environment.SpecialFolder.Windows)[..1]).DriveFormat; } catch { return ""; }
+            case "glyph_version": return typeof(Stats).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "";
             case "window": return Fmt.Trunc(ActiveWindowTitle(), spec);
             case "window_app": return Fmt.Trunc(Tasks.ForegroundApp(), spec);
             case "greeting":
@@ -165,6 +218,7 @@ internal static class Stats
             "ram_total" => Fmt.Bytes(s.RamTotal, spec),
             "disk" => Fmt.Num(s.Disk, spec),
             "disk_free" => Fmt.Bytes(s.DiskFree, spec),
+            "disk_used" => Fmt.Bytes(Math.Max(0, s.DiskTotal - s.DiskFree), spec),
             "disk_total" => Fmt.Bytes(s.DiskTotal, spec),
             "net_down" => Fmt.Bytes(s.NetDown, spec) + "/s",
             "net_up" => Fmt.Bytes(s.NetUp, spec) + "/s",

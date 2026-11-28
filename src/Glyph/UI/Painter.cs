@@ -42,6 +42,7 @@ internal sealed class Painter
     {
         switch (e)
         {
+            case TextEl t when t.Rotate != 0 && !Terminal: return (t.Tight ? Px(t.Size) * 1.17f : LineH(t.Size), MeasureText(t));
             case TextEl t: return (MeasureText(t), Terminal ? 1 : t.Tight ? Px(t.Size) * 1.17f : LineH(t.Size));
             case BigEl b:
                 if (Terminal) return (BigFont.Width(b.Text) + (b.HasShadow ? 2 : 0), BigFont.Rows + (b.HasShadow ? 1 : 0));
@@ -74,6 +75,13 @@ internal sealed class Painter
                     return (Math.Max(bx.MinW, cw + 2 * bx.PadX), Math.Max(bx.MinH, ch + 2 * bx.PadY));
                 }
             case SpectrumEl sp: return (Terminal ? 16 : FontSize * 14, Terminal ? Math.Max(1, MathF.Round(sp.Rows)) : sp.Rows * LineH());
+            case RowEl r when r.Vertical && !Terminal:
+                {
+                    float w = 0, h = 0;
+                    foreach (var c in r.Items) { var (cw, ch) = Measure(c); w = Math.Max(w, cw); h += ch; }
+                    h += Math.Max(0, r.Items.Count - 1) * r.Gap * Gap;
+                    return (w, h);
+                }
             case RowEl r:
                 {
                     float w = 0, h = 0;
@@ -109,8 +117,20 @@ internal sealed class Painter
     public void Arrange(El e, float x, float y, float w)
     {
         var (mw, mh) = Measure(e);
-        e.X = x; e.Y = y; e.W = e.Stretch || e is ColEl ? w : Math.Min(mw, w); e.H = mh;
-        if (e is RowEl r)
+        e.X = x; e.Y = y; e.W = e.Stretch || e is ColEl || e is TextEl { Align: "center" or "right", Rotate: 0 } ? w : Math.Min(mw, w); e.H = mh;   // centred / right text needs the room to move in
+        if (e is RowEl { Vertical: true } vr && !Terminal)
+        {
+            // a column: each item centred across the width, one under the other
+            float cy = y;
+            foreach (var c in vr.Items)
+            {
+                var (cw, ch) = Measure(c);
+                Arrange(c, x + Math.Max(0, (w - cw) / 2), cy, Math.Min(cw, w));
+                cy += ch + vr.Gap * Gap;
+            }
+            e.W = w;
+        }
+        else if (e is RowEl r)
         {
             float fixedW = 0; int stretchers = 0;
             foreach (var c in r.Items) { if (c.Stretch) stretchers++; else fixedW += Measure(c).w; }
@@ -316,6 +336,18 @@ internal sealed class Painter
         float x = ox + e.X, y = oy + e.Y, w = e.W, h = e.H;
         switch (e)
         {
+            case TextEl t when t.Rotate != 0:
+                {
+                    // drawn as if flat in a box turned around the element's middle
+                    var t0 = c.Dc.Transform;
+                    var mid = new System.Numerics.Vector2(x + w / 2, y + h / 2);
+                    c.Dc.Transform = System.Numerics.Matrix3x2.CreateRotation(t.Rotate * MathF.PI / 180) * System.Numerics.Matrix3x2.CreateTranslation(mid) * t0;
+                    var (ex, ey, ew, eh, er) = (t.X, t.Y, t.W, t.H, t.Rotate);
+                    t.X = -h / 2 - ox; t.Y = -w / 2 - oy; t.W = h; t.H = w; t.Rotate = 0;
+                    try { PaintVector(t, c, ox, oy, bg, radius); }
+                    finally { (t.X, t.Y, t.W, t.H, t.Rotate) = (ex, ey, ew, eh, er); c.Dc.Transform = t0; }
+                    return;
+                }
             case TextEl t:
                 {
                     float tw = MeasureText(t);
@@ -345,6 +377,7 @@ internal sealed class Painter
                         var sc = textOverride ?? s.Color;
                         if (t.Spacing != 0) Glyph.Render.FramePainter.DrawText(c, s.Text, sx, y + (h - size * 1.36f) / 2, size * 1.36f, sc, font, size, bold, t.Spacing);
                         else c.Text(s.Text, new RectangleF(sx, y + (h - size * 1.36f) / 2, sw + 4, size * 1.5f), sc, font, size, bold);
+                        if (t.Strike && s.Text.Trim().Length > 0) c.Fill(new RectangleF(sx, y + h * 0.53f, sw, Math.Max(1, size * 0.07f)), sc);
                         sx += sw;
                     }
                     break;
@@ -379,8 +412,8 @@ internal sealed class Painter
             case MeterEl m when m.ValueAlign == "sides":
                 {
                     float lh = LineH();
-                    float lw = m.Label.Length > 0 ? Canvas!.Measure(m.Label, Font, FontSize, false) + FontSize * 0.6f : 0;
-                    float vw = m.ValueText.Length > 0 ? Canvas!.Measure(m.ValueText, Font, FontSize, false) + FontSize * 0.6f : 0;
+                    float lw = m.Label.Length > 0 ? Math.Max(m.LabelWidth, Canvas!.Measure(m.Label, Font, FontSize, false) + FontSize * 0.6f) : 0;
+                    float vw = m.ValueText.Length > 0 ? Math.Max(m.ValueWidth, Canvas!.Measure(m.ValueText, Font, FontSize, false) + FontSize * 0.6f) : 0;
                     float ty = y + (h - lh) / 2;
                     c.Text(m.Label, new RectangleF(x, ty, lw + 4, lh), m.LabelColor, Font, FontSize);
                     c.Text(m.ValueText, new RectangleF(x + w - vw, ty, vw, lh), m.ValueColor, Font, FontSize, false, "right");

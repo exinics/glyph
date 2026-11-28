@@ -171,6 +171,52 @@ Glyph\
   such windows can't forward to each other. Re-raised every 2 s; broadcasts "TaskbarCreated" at start and when
   Explorer restarts. Clicks: v4 icons get (x,y | event, id) + NIN_SELECT / WM_CONTEXTMENU, older ones (id, event);
   AllowSetForegroundWindow(owner pid) first. Glyph's own FindWindow("Shell_TrayWnd") uses `Tray.ExplorerTray()`.
+- **Wallpaper Engine** (`Data\WallpaperEngine.cs`, backdrop type `wallpaper_engine`): finds Steam libraries
+  (HKCU SteamPath + libraryfolders.vdf), lists workshop/content/431960 + projects/myprojects + defaultprojects
+  (project.json title/type/preview). `Engine.LoadAll` sets `Composer.LiveEngine` per screen; then the desktop renderer
+  is a DirectComposition swap chain (premultiplied, cleared to alpha 0, screen effects skipped) on the same WorkerW
+  child, so WE's `WPEDesktopDX11Window` sibling shows through. WE raises its window when it opens a wallpaper:
+  `DesktopHost.KeepOnTop` (every second) puts ours back above (GW_HWNDPREV). `App.ApplyWallpaperEngine` runs
+  `wallpaper64.exe -control openWallpaper -file <project.json> -monitor <index in Screens.All()>` (+ mute/unmute,
+  closeWallpaper for screens that stop using it), only when the wanted wallpaper changed; no screen using it = WE closed
+  (if close_wallpaper_engine). Previews/snapshots draw the item's preview image instead.
+- **Side bar** (bar `position = left/right`, smooth themes): `BarOptions.PlaceIn` (bar rect + remaining area, used by
+  the preview and snapshots), appbar ABE_LEFT/RIGHT, groups and icon/workspace/task/tray rows are `RowEl.Vertical`
+  (Painter stacks them centred), text modules `rotate = down/up` (Painter draws the TextEl under a D2D rotation).
+- **Lists and lyrics** (`Data\Lists.cs`, `Data\Lyrics.cs`, `Widgets\ListWidgets.cs`): list widgets read
+  config\lists\<name>.txt (re-read on change; the watcher ignores lists\), click = action `list:toggle:<name>:<n>`
+  (runs in the desktop process, rewrites the line). Lyrics: lrclib.net `/api/get` (title, artist, album, duration)
+  then `/api/search`; cached per song in logs\lyrics (empty file = none); the current line from the media position.
+- **Glow and halo** (`Render\Aura.cs`, theme [ui] halo/glow + per widget "Glow & halo" + bar glow): the widget's
+  drawing is recorded (command list), rendered ONCE into a bitmap of its bounds, and effects run on that bitmap: halo =
+  Shadow (blur) with its alpha boosted ×3.5 and clamped (thin text blurs too faint otherwise), drawn under; glow =
+  GaussianBlur (self) or Shadow (a colour), boosted, added with CompositeMode.Plus at two sizes. Panels apply it to
+  their contents (plus frames without fill/pattern), not their glass. Gotchas found: a command list holding a layer
+  (clips, legend gaps, fades) fed to several effects fails the frame with D2DERR_LAYER_ALREADY_IN_USE (EndDraw result,
+  now logged as "drawing failed"), hence the bitmap; an empty recording has no bounds (skipped); Composer flushes
+  after each widget with an aura. Patterns now fill one path geometry instead of hundreds of rectangles.
+- **Performance** (measured live on the 680M laptop, "highest" preset, 2026-11-28; before → after): ember 77 → 9 %
+  of a core at ~55 fps, grove 8.9 → ~2 %, neon 5.4 → ~4 %; RAM neon 175 → 123 MB. How: (1) widget contents are
+  checked for changes 4×/s (`Surface.SigAt`, bar `BarSigAt`), not every tick; (2) while only the wallpaper layers
+  move, the widgets are drawn once into a kept full-screen picture and reused (`Renderer.OverlayMode` 1 = draw and
+  keep, 2 = reuse; `Surface.WidgetsDirty`, `Composer.OverlayMoving`, layout skipped via `Composer.LayoutWidgets`);
+  (3) a frame whose character grid equals the last one (`SameGrid`) isn't drawn or presented; (4) glow/halo widgets
+  keep their finished picture while their signature, bounds, hover and transform are unchanged (`Aura.Kept`,
+  `Widget.AuraKey`; keeping EVERY widget was tried: +10-20 MB for ~no CPU, reverted); (5) idle mouse polling 10 Hz
+  when the mouse is still (refresh rate / 30 Hz while it moves); (6) stats: network adapter list every 15 s, disk
+  every 10 s, audio endpoint kept 5 s; bar app names cached per process; font keys only rebuilt on change;
+  (6b) preset `wallpaper_fps` (PresetOptions.WallpaperRate, default theme; low 15): while ONLY the scene layers
+  move (no widget/tween/ripple/cursor/mouse), the loop runs at it, so "highest" no longer draws embers at 60 Hz
+  (ember 9 -> ~7 % of a core, 20 frames/s); (7) pictures decoded at the size they're shown (`Canvas.Picture`); `Renderer.TrimDevice` = D2D ClearResources +
+  IDXGIDevice3.Trim on trims. Tools: scratchpad bench.ps1 (CPU/RAM/fps per theme on the real desktop), dotnet-trace
+  `--profile dotnet-sampled-thread-time --format Speedscope` + a small analyser, a VirtualQueryEx map (big blocks =
+  AMD driver pools).
+- **Desktop editing** (`UI\Prompt.cs`): a themed borderless top-most form at the mouse (fonts from config\fonts via
+  PrivateFontCollection, Alt tap so it may take the focus), Enter saves / Esc or deactivate cancels. Actions
+  `list:edit:<style>:<n>:<name>` (n = -1 adds; agenda asks time/what/note; empty = delete) and `weather:city:<name>`
+  (rewrites that widget in widgets.toml).
+- **Font weights in names** (`Fonts.Resolve`): "Rubik Black" = family Rubik + weight Black when the family itself
+  isn't found (Google Fonts' static files share one family name).
 - **Converter loop** (`ConvertJob.Run`): crossfade decodes the clip minus its last `blend` frames plus a second ffmpeg for
   that tail, mixing tail frame i into head frame i (RGB before conversion); bounce stores cells and appends them reversed.
 - **Input**: raw input (RIDEV_INPUTSINK) on a hidden window gives left-button events anywhere; if the window under

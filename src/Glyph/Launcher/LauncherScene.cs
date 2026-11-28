@@ -118,13 +118,18 @@ internal sealed class LauncherScene
         float pad = panelF != null ? (panelF.Padding >= 0 ? panelF.Padding : ui.Padding) : ui.Padding;
         float small = fs * 0.78f, lineH = small * 1.6f;
         float headSize = fs * 2.0f, headH = O.Heading.Length > 0 ? headSize * 1.35f : 0;
-        float inputH = fs * 2.1f;
+        float inputH = fs * 2.6f;   // the typed line plus clear room above the ruler (letters like g and y hang down)
         float rowH = O.KindBelow ? fs * 2.75f : fs * 2.15f;
         float gap = rowF != null ? O.RowGap : 0;
         float numW = O.Numbers ? rowH * 0.62f + fs * 0.8f : 0;
         float curve = Math.Abs(O.Curve);
         int n = Math.Min(st.Results.Count - st.Top, O.MaxResults);
-        float h = pad * 2 + (O.TopLine.Length > 0 ? lineH : 0) + headH + inputH + (n > 0 ? pad * 0.6f + n * rowH + Math.Max(0, n - 1) * gap : 0) + (O.BottomLine.Length > 0 ? lineH + pad * 0.4f : 0);
+        // the ruler under the search line is a band of its own (its ticks hang below the line), and the rows keep
+        // clear of it including anything their frames draw above them (tabs, glows), so nothing overlaps the text
+        const float rulerH = 6;   // the line + its longest ticks (5 px)
+        float rowAbove = Math.Max(rowF != null ? FramePainter.Outside(rowF).T : 0, selF != null ? FramePainter.Outside(selF).T : 0);
+        float afterRuler = Math.Max(pad * 0.6f, 6) + rowAbove;
+        float h = pad * 2 + (O.TopLine.Length > 0 ? lineH : 0) + headH + inputH + rulerH + (n > 0 ? afterRuler + n * rowH + Math.Max(0, n - 1) * gap : 0) + (O.BottomLine.Length > 0 ? lineH + pad * 0.4f : 0);
         var outs = panelF != null ? FramePainter.Outside(panelF) : new FramePainter.Insets(0, 0, 0, 0);
         var panel = new RectangleF(6 + outs.L, 6 + outs.T, width - 12 - outs.L - outs.R, h);
         if (panelF != null) FramePainter.Draw(c, panelF, t, panel, "", "", fs);
@@ -149,20 +154,21 @@ internal sealed class LauncherScene
             if (O.HeadingNote.Length > 0) FramePainter.DrawText(c, O.HeadingNote, x + hw + fs * 0.8f, y + headH * 0.12f, headH, dim, font, small, false, O.Spacing);
             y += headH;
         }
-        // the search line, with a ruler under it
+        // the search line, with a ruler under it (the text sits in the top part, well clear of the ruler)
         float big = fs * 1.05f;
         float ix = x + numW;
+        float tl = inputH - fs * 0.7f;   // the text's band
         float pw = c.Measure(Prompt, font, big, false);
-        c.Text(Prompt, new RectangleF(ix, y + (inputH - big * 1.36f) / 2, pw + 6, big * 1.5f), acc, font, big);
+        c.Text(Prompt, new RectangleF(ix, y + (tl - big * 1.36f) / 2, pw + 6, big * 1.5f), acc, font, big);
         float tx = ix + pw + fs * 0.6f;
-        if (st.Query.Length == 0) c.Text(O.Placeholder, new RectangleF(tx, y + (inputH - big * 1.36f) / 2, right - tx, big * 1.5f), dim, font, big);
+        if (st.Query.Length == 0) c.Text(O.Placeholder, new RectangleF(tx, y + (tl - big * 1.36f) / 2, right - tx, big * 1.5f), dim, font, big);
         float qw = st.Query.Length > 0 ? c.Measure(st.Query, font, big, false) : 0;
-        if (st.Query.Length > 0) c.Text(st.Query, new RectangleF(tx, y + (inputH - big * 1.36f) / 2, qw + 8, big * 1.5f), text, font, big);
-        c.Fill(new RectangleF(tx + qw + 2, y + (inputH - big * 1.2f) / 2, Math.Max(2, fs * 0.13f), big * 1.2f), acc);
-        float ly = y + inputH - 2;
+        if (st.Query.Length > 0) c.Text(st.Query, new RectangleF(tx, y + (tl - big * 1.36f) / 2, qw + 8, big * 1.5f), text, font, big);
+        c.Fill(new RectangleF(tx + qw + 2, y + (tl - big * 1.2f) / 2, Math.Max(2, fs * 0.13f), big * 1.2f), acc);
+        float ly = y + inputH;
         c.Fill(new RectangleF(x, ly, right - x, 1), t[O.BorderColor], 0, 0.5f);
         for (float q = x; q <= right; q += 7) c.Fill(new RectangleF(q, ly, 1, ((int)((q - x) / 7) % 5 == 0) ? 5 : 3), t[O.BorderColor], 0, 0.5f);
-        y += inputH + pad * 0.6f;
+        y += inputH + rulerH + afterRuler;
 
         var rects = new RectangleF[n];
         for (int k = 0; k < n; k++)

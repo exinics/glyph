@@ -67,10 +67,37 @@ internal static class Tasks
             res.Add(new Win(h, title, app, h == fg, Native.IsIconic(h)));
             return true;
         }, IntPtr.Zero);
-        return res;
+        // Windows lists windows front to back, so using one would move it to the front of the bar: instead each
+        // window keeps the place it got when it first appeared (new ones go on the end, like Windows' taskbar).
+        // Windows already open when Glyph starts are placed back to front (roughly oldest first).
+        for (int i = res.Count - 1; i >= 0; i--)
+            if (!order.ContainsKey(res[i].Handle)) order[res[i].Handle] = nextPlace++;
+        foreach (var gone in order.Keys.Where(k => !res.Any(w => w.Handle == k)).ToList()) order.Remove(gone);
+        return res.OrderBy(w => order[w.Handle]).ToList();
     }
 
+    static readonly Dictionary<IntPtr, long> order = new();
+    static long nextPlace;
+
+    // a program's name only changes when the process does: kept per process (with its start time, so a
+    // recycled process id isn't mistaken for the old program); looking it up reads the exe's version info
+    static readonly Dictionary<uint, (DateTime started, string name)> names = new();
+
     static string AppName(uint pid)
+    {
+        lock (names)
+        {
+            DateTime started = default;
+            try { using var pp = Process.GetProcessById((int)pid); started = pp.StartTime; } catch { }
+            if (names.TryGetValue(pid, out var hit) && hit.started == started) return hit.name;
+            var name = LookUpName(pid);
+            if (names.Count > 300) names.Clear();
+            names[pid] = (started, name);
+            return name;
+        }
+    }
+
+    static string LookUpName(uint pid)
     {
         try
         {

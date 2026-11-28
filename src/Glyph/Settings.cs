@@ -13,7 +13,7 @@ internal sealed class AppSettings
     [Category("Glyph"), DisplayName("Start with Windows"), Description("Start Glyph when you sign in.")]
     public bool StartWithWindows { get; set; }
 
-    [Category("Glyph"), DisplayName("Close Wallpaper Engine"), Description("Glyph and Wallpaper Engine can't both draw the wallpaper, so Glyph closes it when it starts.")]
+    [Category("Glyph"), DisplayName("Close Wallpaper Engine"), Description("Close Wallpaper Engine while Glyph draws the wallpaper itself. Themes whose backdrop is a Wallpaper Engine wallpaper (Wallpaper > Backdrop > Type: wallpaper_engine) start it instead and draw on top of it.")]
     public bool CloseWallpaperEngine { get; set; } = true;
 
     [Category("Glyph"), DisplayName("Hide Windows desktop icons"), Description("Hide Windows' own desktop icons while Glyph runs (shortcut panels replace them). They come back when Glyph quits.")]
@@ -123,6 +123,9 @@ internal sealed class PresetOptions
     [DisplayName("Frame rate"), Description("max = as fast as the screen shows frames (its refresh rate, e.g. 60 or 144), whatever the theme says. theme = each theme's own frame rate. A number = the theme's frame rate, but no more than this.")]
     public string Fps { get; set; } = "max";
 
+    [DisplayName("Wallpaper animation"), Description("Frame rate while the only thing moving is the wallpaper's own animation (ASCII sparks, rain, smoke, stars...). theme = the theme's own frame rate (e.g. 20 or 30: these move a character at a time, so more looks the same and costs far more). max = the screen's refresh rate. A number = no more than this. The mouse, widgets, animations and dragging still use Frame rate above.")]
+    public string WallpaperFps { get; set; } = "theme";
+
     [DisplayName("Screen effects"), Description("Draw the theme's screen effects (bloom, scanlines, curvature...). Off saves the most work for the graphics chip.")]
     public bool Effects { get; set; } = true;
 
@@ -134,7 +137,15 @@ internal sealed class PresetOptions
 
     public static PresetOptions MakeHighest() => new();
     public static PresetOptions MakeBalanced() => new() { Fps = "theme", AnimationDetail = "theme" };
-    public static PresetOptions MakeLow() => new() { Fps = "15", Effects = false, AnimationDetail = "low", SmoothDragging = false };
+    public static PresetOptions MakeLow() => new() { Fps = "15", WallpaperFps = "15", Effects = false, AnimationDetail = "low", SmoothDragging = false };
+
+    /// The frame rate while only the wallpaper layers move (never more than FrameRate).
+    public int WallpaperRate(int screen, int theme)
+    {
+        var v = WallpaperFps.Trim().ToLowerInvariant();
+        int r = v == "max" ? Math.Max(1, screen) : int.TryParse(v, out int n) && n > 0 ? Math.Min(theme, n) : theme;
+        return Math.Max(1, Math.Min(r, FrameRate(screen, theme)));
+    }
 
     /// The frame rate to draw at: `screen` = the display's refresh rate, `theme` = the theme's own.
     public int FrameRate(int screen, int theme)

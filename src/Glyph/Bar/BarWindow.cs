@@ -21,7 +21,7 @@ internal sealed class BarWindow : NativeWindow, IDisposable
     [StructLayout(LayoutKind.Sequential)] struct WINCOMPATTRDATA { public int Attribute; public IntPtr Data; public int SizeOfData; }
 
     const uint ABM_NEW = 0, ABM_REMOVE = 1, ABM_QUERYPOS = 2, ABM_SETPOS = 3, ABM_ACTIVATE = 6, ABM_WINDOWPOSCHANGED = 9;
-    const uint ABE_TOP = 1, ABE_BOTTOM = 3;
+    const uint ABE_LEFT = 0, ABE_TOP = 1, ABE_RIGHT = 2, ABE_BOTTOM = 3;
     const uint CallbackMsg = 0x0400 + 77;
     const int WS_POPUP = unchecked((int)0x80000000), WS_EX_TOPMOST = 0x8, WS_EX_NOREDIRECTIONBITMAP = 0x00200000;
 
@@ -80,16 +80,28 @@ internal sealed class BarWindow : NativeWindow, IDisposable
     {
         int height = (int)MathF.Round(O.Height * scale), margin = (int)MathF.Round(O.Margin * scale);
         int total = height + margin * 2;
-        bool top = O.Position != "bottom";
-        var strip = new Native.RECT { Left = screen.Left, Right = screen.Right, Top = top ? screen.Top : screen.Bottom - total, Bottom = top ? screen.Top + total : screen.Bottom };
+        var pos = O.Position;
+        var strip = pos switch
+        {
+            "bottom" => new Native.RECT { Left = screen.Left, Right = screen.Right, Top = screen.Bottom - total, Bottom = screen.Bottom },
+            "left" => new Native.RECT { Left = screen.Left, Right = screen.Left + total, Top = screen.Top, Bottom = screen.Bottom },
+            "right" => new Native.RECT { Left = screen.Right - total, Right = screen.Right, Top = screen.Top, Bottom = screen.Bottom },
+            _ => new Native.RECT { Left = screen.Left, Right = screen.Right, Top = screen.Top, Bottom = screen.Top + total },
+        };
         if (O.ReserveSpace)
         {
             var abd = new APPBARDATA { cbSize = Marshal.SizeOf<APPBARDATA>(), hWnd = Handle, uCallbackMessage = CallbackMsg };
             if (!registered) { SHAppBarMessage(ABM_NEW, ref abd); registered = true; }
-            abd.uEdge = top ? ABE_TOP : ABE_BOTTOM;
+            abd.uEdge = pos switch { "bottom" => ABE_BOTTOM, "left" => ABE_LEFT, "right" => ABE_RIGHT, _ => ABE_TOP };
             abd.rc = strip;
             SHAppBarMessage(ABM_QUERYPOS, ref abd);
-            if (top) abd.rc.Bottom = abd.rc.Top + total; else abd.rc.Top = abd.rc.Bottom - total;
+            switch (pos)
+            {
+                case "bottom": abd.rc.Top = abd.rc.Bottom - total; break;
+                case "left": abd.rc.Right = abd.rc.Left + total; break;
+                case "right": abd.rc.Left = abd.rc.Right - total; break;
+                default: abd.rc.Bottom = abd.rc.Top + total; break;
+            }
             SHAppBarMessage(ABM_SETPOS, ref abd);
             strip = abd.rc;
         }

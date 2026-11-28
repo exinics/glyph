@@ -27,6 +27,8 @@ internal sealed class TextEl : El
     public string Align = "left";
     public bool Bold, Mono, Tight;
     public float Spacing;               // smooth style: extra pixels between letters
+    public bool Strike;                 // crossed out (a done to-do item)
+    public float Rotate;                // smooth style: turned 90 (reads downwards) or -90 (upwards), e.g. on a side bar
     public Rgba? Background;            // a pill behind the text (bar modules)
     public Rgba? Shadow;                // smooth style: the text again, offset a little, under it
     public float ShadowX = 2, ShadowY = 2;
@@ -52,6 +54,7 @@ internal sealed class BigEl : El
 
 internal sealed class MeterEl : El
 {
+    public float LabelWidth, ValueWidth;   // smooth "sides" meters: at least this many pixels for the label / value
     public string Label = "", ValueText = "";
     public float Value;
     public Rgba Fill, Track, LabelColor, ValueColor;
@@ -144,6 +147,7 @@ internal sealed class RowEl : El
     public List<El> Items = new();
     public float Gap = 1;               // cells (terminal) — smooth uses this × the font size
     public string Align = "left";
+    public bool Vertical;               // smooth style: items stacked top to bottom (centred across), e.g. on a side bar
     public override IEnumerable<El> Children => Items;
     public override bool Stretch => Items.Any(i => i.Stretch);
     public override void Sig(StringBuilder sb) { foreach (var i in Items) i.Sig(sb); }

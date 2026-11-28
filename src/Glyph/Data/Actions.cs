@@ -96,6 +96,29 @@ internal static class Actions
             switch (kind)
             {
                 case "media": Media.Control(arg); return;
+                case "list":   // list:toggle:<name>:<n> = tick item n; list:edit:<style>:<n>:<name> = edit box (n = -1: add)
+                    {
+                        var parts = arg.Split(':');
+                        if (parts.Length >= 3 && parts[0] == "toggle" && int.TryParse(parts[^1], out var n)) Lists.Toggle(string.Join(":", parts[1..^1]), n);
+                        else if (parts.Length >= 4 && parts[0] == "edit" && int.TryParse(parts[2], out var k)) Lists.Edit(parts[1], string.Join(":", parts[3..]), k);
+                        return;
+                    }
+                case "weather":   // weather:city:<widget name> = ask for the city and save it to that weather widget
+                    {
+                        if (!arg.StartsWith("city:")) return;
+                        var wname = arg[5..];
+                        var theme = Glyph.Ui.Prompt.Theme;
+                        if (theme == null) return;
+                        var file = Glyph.Widgets.WidgetsFile.Load(theme, new List<string>());
+                        var w = file.Widgets.OfType<Glyph.Widgets.WeatherOptions>().FirstOrDefault(x => x.Name == wname) ?? file.Widgets.OfType<Glyph.Widgets.WeatherOptions>().FirstOrDefault();
+                        if (w == null) return;
+                        Glyph.Ui.Prompt.Ask("weather", new[] { ("Your city (e.g. London)", w.City) }, v =>
+                        {
+                            w.City = v[0]; w.Latitude = 0; w.Longitude = 0;
+                            file.Save(theme.Name);
+                        });
+                        return;
+                    }
                 case "volume":
                     if (arg == "mute") Audio.ToggleMute(); else if (arg == "up") Audio.Change(0.05f); else if (arg == "down") Audio.Change(-0.05f);
                     else if ((arg.StartsWith('+') || arg.StartsWith('-')) && float.TryParse(arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var dv)) Audio.Change(dv / 100f);

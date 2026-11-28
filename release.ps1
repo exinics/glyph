@@ -48,7 +48,7 @@ if ($LocalOnly) { return }
 
 # 3. commit, tag, push, publish
 git -C $root add -A
-git -C $root commit -m "Glyph v$Version" | Out-Null
+git -C $root commit -m "Glyph v$Version" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" | Out-Null
 git -C $root tag "v$Version"
 git -C $root push origin HEAD --tags
 if ($LASTEXITCODE -ne 0) { throw "push failed" }

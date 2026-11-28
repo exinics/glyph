@@ -164,6 +164,12 @@ internal sealed class UiOptions
     [Description("Space inside panels, in pixels."), Range(0, 100)] public float Padding { get; set; } = 12;
     [DisplayName("Panel frame"), Description("A frame (Frames page) for every panel whose Frame is auto. none = plain panels."), TypeConverter(typeof(FrameNameConverter))] public string PanelFrame { get; set; } = "none";
     [DisplayName("Button frame"), Description("A frame for buttons in panels (e.g. media controls). none = plain buttons."), TypeConverter(typeof(FrameNameConverter))] public string ButtonFrame { get; set; } = "none";
+    [DisplayName("Halo"), Description("Smooth style: a soft blur of this colour behind every widget's text and shapes, so light text stays readable on a light wallpaper (e.g. black). none = no halo. Each widget can change it (Glow & halo)."), Color, TypeConverter(typeof(ColorNameConverter))] public string Halo { get; set; } = "none";
+    [DisplayName("Halo size"), Description("How far the halo spreads, in pixels."), Range(0.5, 60)] public float HaloSize { get; set; } = 6;
+    [DisplayName("Halo strength"), Description("How dark (strong) it is: 0 = none, 1 = full, up to 2 = a second, tighter layer for very light wallpapers."), Range(0, 2)] public float HaloStrength { get; set; } = 0.7f;
+    [DisplayName("Glow"), Description("Smooth style: things light up like neon or an old screen. self = each thing glows in its own colours, or a colour = everything glows in that colour. none = no glow. Each widget can change it (Glow & halo)."), TypeConverter(typeof(GlowNameConverter))] public string Glow { get; set; } = "none";
+    [DisplayName("Glow size"), Description("How far the glow spreads, in pixels."), Range(0.5, 80)] public float GlowSize { get; set; } = 8;
+    [DisplayName("Glow strength"), Description("How bright the glow is (up to 3 = blinding)."), Range(0, 3)] public float GlowStrength { get; set; } = 0.8f;
 }
 
 /// The active theme: named colours (the palette), the 16 terminal colours and the theme's options.
@@ -208,6 +214,8 @@ internal sealed class Theme
 
     /// True if any of the theme's frames has a spotlight (then the desktop redraws as the mouse moves over widgets).
     public bool AnySpotlight => Frames.Any(f => f.Spotlight != "none");
+    /// How far outside a box a spotlight still lights it (FramePainter draws it within 0.6 × its size of the box).
+    public float SpotlightReach => Frames.Where(f => f.Spotlight != "none").Select(f => f.SpotlightSize * 0.6f).DefaultIfEmpty(0).Max();
 
     public static Theme Load(string name, List<string> problems)
     {

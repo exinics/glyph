@@ -57,7 +57,7 @@ internal abstract class PanelWidget : Widget
     {
         if (!visible || root == null || Bounds.IsEmpty) yield break;
         var own = new[] { "*own", "Colours" };
-        yield return new Part("Box", Bounds, new[] { "Placement", "Box", "Panel", "Link" }, P.Panel ? "Frame" : "");
+        yield return new Part("Box", Bounds, new[] { "Placement", "Box", "Panel", "Link", "Glow & halo" }, P.Panel ? "Frame" : "");
         var env = layoutEnv;
         if (env == null) yield break;
         var content = PxRect(root, env);
@@ -270,8 +270,15 @@ internal abstract class PanelWidget : Widget
         if (frame != null)
         {
             bool hotF = Hover == clickables.Count && (P.BoxHoverColor != "none" || frame.HoverFill != "none");
-            FramePainter.Draw(c, frame, T, Bounds, title, titleRight, p.FontSize, hotF);
-            p.PaintVector(root, c, 0, 0, PanelBg, Math.Max(2, (frame.Radius >= 0 ? frame.Radius : radius) * 0.6f));
+            float rr = Math.Max(2, (frame.Radius >= 0 ? frame.Radius : radius) * 0.6f);
+            // a frame with no fill (lines and a title) glows with the contents; a filled one is glass behind them
+            bool frameIn = frame.Fill == "none" && frame.Pattern == "none";
+            if (!frameIn) FramePainter.Draw(c, frame, T, Bounds, title, titleRight, p.FontSize, hotF);
+            Glyph.Render.Aura.Draw(c, Aura, ((object)this, AuraKey), () =>
+            {
+                if (frameIn) FramePainter.Draw(c, frame, T, Bounds, title, titleRight, p.FontSize, hotF);
+                p.PaintVector(root, c, 0, 0, PanelBg, rr);
+            });
             p.FontSize = e.BaseFontSize;
             return;
         }
@@ -283,11 +290,14 @@ internal abstract class PanelWidget : Widget
             if (hot) c.Fill(Bounds, T[P.BoxHoverColor], radius, 0.25f);
             c.Stroke(Bounds, Border, P.BoxBorderWidth(T), radius);
         }
-        if (title.Length > 0)
-            c.Text(title, new RectangleF(Bounds.X + pad, Bounds.Y + pad * 0.8f, Bounds.Width - 2 * pad, titleH), Accent, p.Font, p.Px(TextSize.Title), ui.BoldTitles);
-        if (titleRight.Length > 0)
-            c.Text(titleRight, new RectangleF(Bounds.X + pad, Bounds.Y + pad * 0.8f, Bounds.Width - 2 * pad, titleH), Dim, p.Font, p.Px(TextSize.Small), false, "right");
-        p.PaintVector(root, c, 0, 0, PanelBg, Math.Max(4, radius * 0.6f));
+        Glyph.Render.Aura.Draw(c, Aura, ((object)this, AuraKey), () =>
+        {
+            if (title.Length > 0)
+                c.Text(title, new RectangleF(Bounds.X + pad, Bounds.Y + pad * 0.8f, Bounds.Width - 2 * pad, titleH), Accent, p.Font, p.Px(TextSize.Title), ui.BoldTitles);
+            if (titleRight.Length > 0)
+                c.Text(titleRight, new RectangleF(Bounds.X + pad, Bounds.Y + pad * 0.8f, Bounds.Width - 2 * pad, titleH), Dim, p.Font, p.Px(TextSize.Small), false, "right");
+            p.PaintVector(root, c, 0, 0, PanelBg, Math.Max(4, radius * 0.6f));
+        });
         p.FontSize = e.BaseFontSize;
     }
 }
@@ -323,7 +333,7 @@ internal sealed class SystemWidget : PanelWidget
     MeterEl Meter(string label, float v, string text) => new()
     {
         Label = label, Value = v, ValueText = text, Fill = Accent, Track = Line, LabelColor = Dim, ValueColor = Text, Chars = o.MeterChars,
-        Segments = o.Segments, ValueAlign = o.OneLine ? "sides" : "",
+        Segments = o.Segments, ValueAlign = o.OneLine ? "sides" : "", LabelWidth = o.LabelWidth, ValueWidth = o.ValueWidth,
     };
 
     protected override ColEl? Build(WidgetEnv e)
@@ -358,6 +368,12 @@ internal sealed class SystemWidget : PanelWidget
                 case "network":
                     Add(new TextEl { Spans = { new Span(term ? "net  " : "Network  ", Dim), new Span($"↓ {Fmt.Bytes(s.NetDown, "")}/s   ↑ {Fmt.Bytes(s.NetUp, "")}/s", Text) } });
                     if (o.Graphs) col.Items.Add(new GraphEl { Values = s.DownHist, Max = 0, Color = Accent, Rows = o.GraphRows });
+                    break;
+                case "uptime":
+                    Add(new TextEl { Spans = { new Span(term ? "up   " : "Uptime  ", Dim), new Span(Stats.Value("uptime", "") ?? "", Text) } });
+                    break;
+                case "netup":   // network and uptime on one line
+                    Add(new TextEl { Spans = { new Span($"↓ {Fmt.Bytes(s.NetDown, "")}/s   ↑ {Fmt.Bytes(s.NetUp, "")}/s", Dim), new Span("   up ", Dim), new Span(Stats.Value("uptime", "") ?? "", Text) }, Size = TextSize.Small });
                     break;
             }
         }
@@ -567,9 +583,15 @@ internal sealed class WeatherWidget : PanelWidget
 
     protected override ColEl? Build(WidgetEnv e)
     {
-        Weather.Configure(o.City, o.Latitude, o.Longitude, o.Units == "fahrenheit");
         var col = new ColEl();
-        col.Items.Add(new TextEl { Spans = S(o.Line, Text), Size = TextSize.Large });
+        if (o.City.Trim().Length == 0 && o.Latitude == 0 && o.Longitude == 0)
+        {
+            col.Items.Add(new TextEl("set your city", Text) { Size = TextSize.Large, Action = $"weather:city:{o.Name}" });
+            col.Items.Add(new TextEl("click to type it in", Dim) { Size = TextSize.Small, Action = $"weather:city:{o.Name}" });
+            return col;
+        }
+        Weather.Configure(o.City, o.Latitude, o.Longitude, o.Units == "fahrenheit");
+        col.Items.Add(new TextEl { Spans = S(o.Line, Text), Size = TextSize.Large, Action = o.OnClick.Length == 0 ? $"weather:city:{o.Name}" : "" });
         if (o.Detail.Length > 0 && Weather.Days.Count > 0) col.Items.Add(new TextEl { Spans = S(o.Detail, Dim), Size = TextSize.Small });
         if (o.Days > 0 && Weather.Days.Count > 1)
         {

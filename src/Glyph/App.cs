@@ -36,7 +36,7 @@ internal sealed class App : ApplicationContext
         _ = ui.Handle;
         engine = new Engine(host);
         var s = AppSettings.Load(new List<string>());
-        if (s.CloseWallpaperEngine) CloseWallpaperEngine();
+        if (s.CloseWallpaperEngine && !ThemeUsesEngine(s.Theme)) Glyph.Data.WallpaperEngine.Close();
         ApplyAutostart(s.StartWithWindows);
         DesktopIcons.Apply(s.HideDesktopIcons);
         Taskbar.Apply(s.Taskbar);
@@ -264,18 +264,27 @@ internal sealed class App : ApplicationContext
     {
         var n = e.Name ?? "";
         if (n.EndsWith(".md", StringComparison.OrdinalIgnoreCase) || n.EndsWith("~") || n.EndsWith(".tmp") || n.EndsWith(".part") || Path.GetFileName(n).StartsWith(".")
-            || n.StartsWith("icons\\cache", StringComparison.OrdinalIgnoreCase))
+            || n.StartsWith("icons\\cache", StringComparison.OrdinalIgnoreCase) || n.StartsWith("lists\\", StringComparison.OrdinalIgnoreCase))   // list widgets read their lists themselves
             return;
         try { ui.BeginInvoke(() => { debounce.Stop(); debounce.Start(); }); } catch (Exception ex) { Log.Write("watch: " + ex.Message); }
     }
 
+    string? lastWeKey;
+
     void OnEngineReloaded()
     {
         ThemeSync.Apply(engine.CurrentTheme, engine.CurrentSettings.ThemeSync);
+        Glyph.Ui.Prompt.Theme = engine.CurrentTheme;
         if (tray == null) return;
         var s = engine.CurrentSettings;
         ApplyAutostart(s.StartWithWindows);
-        if (s.CloseWallpaperEngine) CloseWallpaperEngine();
+        ApplyWallpaperEngine(s);
+        // drawn see-through (over Wallpaper Engine) or not: a window can't change between the two kinds of drawing
+        // surface (Windows refuses the second one, and the desktop froze on the old theme's last frame), so the
+        // desktop windows are made again whenever that changes
+        var weKey = string.Join(",", engine.EngineWallpapers.Select(w => w.screen.Number));
+        if (lastWeKey != null && weKey != lastWeKey) { Log.Write("desktop: new windows (see-through drawing changed)"); host.Attach(); }
+        lastWeKey = weKey;
         DesktopIcons.Apply(s.HideDesktopIcons);
         Taskbar.Apply(s.Taskbar);
         SetIcon(s.Theme);
@@ -401,14 +410,27 @@ internal sealed class App : ApplicationContext
         catch (Exception e) { Log.Write($"open {path}: {e.Message}"); }
     }
 
-    static void CloseWallpaperEngine()
+    /// Quick look before the engine has loaded: does the chosen theme's wallpaper.toml use Wallpaper Engine?
+    static bool ThemeUsesEngine(string theme)
     {
-        foreach (var name in new[] { "wallpaper64", "wallpaper32", "webwallpaper32" })
-            foreach (var p in Process.GetProcessesByName(name))
-            {
-                try { p.Kill(); p.WaitForExit(2000); Log.Write($"closed Wallpaper Engine ({name})"); }
-                catch (Exception e) { Log.Write($"couldn't close {name}: {e.Message}"); }
-            }
+        try { var f = Path.Combine(Paths.ThemeDir(theme), "wallpaper.toml"); return File.Exists(f) && File.ReadAllText(f).Contains("wallpaper_engine"); }
+        catch { return false; }
+    }
+
+    /// Screens whose theme plays a Wallpaper Engine wallpaper get it (Wallpaper Engine is started for it);
+    /// when none does, Wallpaper Engine is closed (if Close Wallpaper Engine is on), as Glyph draws every screen.
+    void ApplyWallpaperEngine(AppSettings s)
+    {
+        var want = engine.EngineWallpapers;
+        if (want.Count == 0)
+        {
+            if (s.CloseWallpaperEngine) Glyph.Data.WallpaperEngine.Close();
+            return;
+        }
+        var all = Screens.All();
+        int Monitor(ScreenInfo sc) => Math.Max(0, all.FindIndex(x => x.Number == sc.Number));   // Wallpaper Engine counts screens from 0
+        foreach (var sc in all) if (!want.Any(w => w.screen.Number == sc.Number)) Glyph.Data.WallpaperEngine.Hide(Monitor(sc));
+        foreach (var (sc, item, mute) in want) Glyph.Data.WallpaperEngine.Show(Monitor(sc), item, mute);
     }
 
     static void ApplyAutostart(bool on)

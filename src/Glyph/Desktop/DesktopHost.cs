@@ -21,6 +21,9 @@ internal sealed class DesktopHost : IDisposable
         }
     }
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+
     readonly object gate = new();
     readonly Dictionary<int, HostWindow> wins = new();
     readonly Dictionary<int, Native.POINT> origins = new();
@@ -125,6 +128,7 @@ internal sealed class DesktopHost : IDisposable
         bool broken;
         lock (gate) broken = parent == IntPtr.Zero || !Native.IsWindow(parent) || wins.Values.Any(w => !Native.IsWindow(w.Handle) || Native.GetParent(w.Handle) != parent);
         Sync(broken);
+        KeepOnTop();
         lock (gate)
         {
             if (acknowledged == generation && retired.Count > 0)
@@ -132,6 +136,21 @@ internal sealed class DesktopHost : IDisposable
                 foreach (var r in retired) { try { r.DestroyHandle(); } catch { } }
                 retired.Clear();
             }
+        }
+    }
+
+    /// Wallpaper Engine puts its own window in the same WorkerW (and raises it when it opens a wallpaper):
+    /// keep ours above every other window there, so a see-through desktop shows its wallpaper under the widgets.
+    void KeepOnTop()
+    {
+        List<IntPtr> ours;
+        lock (gate) ours = wins.Values.Select(w => w.Handle).ToList();
+        foreach (var h in ours)
+        {
+            var above = GetWindow(h, 3 /* GW_HWNDPREV */);
+            if (above == IntPtr.Zero || ours.Contains(above)) continue;
+            SetWindowPos(h, IntPtr.Zero /* HWND_TOP */, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 /* NOSIZE NOMOVE NOACTIVATE */);
+            Log.Write($"desktop: raised over {Native.ClassOf(above)}");
         }
     }
 
