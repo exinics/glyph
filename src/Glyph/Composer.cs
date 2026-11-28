@@ -177,7 +177,7 @@ internal sealed class Composer : IDisposable
         Env.W = (int)(pxW / vs); Env.H = (int)(pxH / vs); Env.CellW = cellW; Env.CellH = cellH; Env.Theme = Theme; Env.Time = time;
         SetupPainter(cellW, cellH);
         lastTime = time;
-        Anim.Step(time, dt, w => over.Contains(w));
+        Anim.Step(time, dt, w => over.Contains(w) || w.MouseOver, Env.MouseX, Env.MouseY);
         Scene.Draw(frame);
         DrawInteractionCells();
         foreach (var w in Widgets) { UseFont(w); w.Layout(Env); w.DrawCells(Grid, Env); }
@@ -230,6 +230,16 @@ internal sealed class Composer : IDisposable
         if (b.Type == "gradient") c.Gradient(area, b.Colors.Select(n => Theme[n]).ToList(), b.Angle, b.Shape == "radial");
         else if (b.Type == "image" && b.File.Length > 0) c.Picture(Paths.FindAsset(b.File, Theme.Name, "images"), area, b.Fit, b.Dim);
         if (!Theme.Smooth) return;
+        if (b.Tint != "none" && b.TintAmount > 0)
+        {
+            var tc = Theme[b.Tint];
+            if (b.TintFade == "none") c.Fill(area, tc, 0, b.TintAmount);
+            else
+            {
+                var clear = tc.WithAlpha(0); var full = tc.WithAlpha(b.TintAmount);
+                c.Gradient(area, b.TintFade == "bottom" ? new List<Rgba> { clear, full } : new List<Rgba> { full, clear }, 90, false);
+            }
+        }
         Patterns.Fill(c, area, b.Pattern, Theme[b.PatternColor], b.PatternOpacity, b.PatternSpacing, b.PatternSize);
         Patterns.Fill(c, area, b.Pattern2, Theme[b.Pattern2Color], b.Pattern2Opacity, b.Pattern2Spacing, b.Pattern2Size);
     }
@@ -239,7 +249,7 @@ internal sealed class Composer : IDisposable
         get
         {
             var b = Scene.Options.Backdrop;
-            return b.Type is "gradient" || (b.Type == "image" && b.File.Length > 0) || (Theme.Smooth && (b.Pattern != "none" || b.Pattern2 != "none"));
+            return b.Type is "gradient" || (b.Type == "image" && b.File.Length > 0) || (Theme.Smooth && (b.Pattern != "none" || b.Pattern2 != "none" || b.Tint != "none"));
         }
     }
 
@@ -247,7 +257,14 @@ internal sealed class Composer : IDisposable
     {
         DrawInteractionVector(c);
         if (Theme.Smooth) DrawLinks(c);
-        foreach (var w in Widgets) { UseFont(w); var ww = w; Anim.Apply(c, w, () => ww.DrawVector(c, Env)); }
+        // spotlights in frames follow the mouse; a widget that's growing under the mouse is drawn last (on top)
+        FramePainter.Mouse = Env.MouseOn ? new PointF(Env.MouseX, Env.MouseY) : null;
+        try
+        {
+            foreach (var w in Widgets.Where(w => !w.OnTop).Concat(Widgets.Where(w => w.OnTop)))
+            { UseFont(w); var ww = w; Anim.Apply(c, w, () => ww.DrawVector(c, Env)); }
+        }
+        finally { FramePainter.Mouse = null; }
         UseFont(null);
         if (!SelectionApart) DrawSelectionVector(c);
     }
@@ -330,15 +347,16 @@ internal sealed class Composer : IDisposable
         x /= VS; y /= VS;
         bool changed = false;
         bool hoverTweens = Anim.HasHover;
+        Env.MouseX = x; Env.MouseY = y; Env.MouseOn = overDesktop;
+        bool spot = Theme.Smooth && Theme.AnySpotlight;
         foreach (var w in Widgets)
         {
             int h = overDesktop ? w.HitTest(x, y) : -1;
             if (h != w.Hover) { w.Hover = h; changed = true; }
-            if (hoverTweens)
-            {
-                bool on = overDesktop && w.Covers(x, y);
-                if (on ? over.Add(w) : over.Remove(w)) changed = true;
-            }
+            bool on = overDesktop && w.Covers(x, y);
+            if (on != w.MouseOver) { w.MouseOver = on; changed = true; }
+            if (on && (w.FollowsMouse || spot)) changed = true;   // it changes with every move over it
+            if (hoverTweens && (on ? over.Add(w) : over.Remove(w))) changed = true;
         }
         return changed;
     }

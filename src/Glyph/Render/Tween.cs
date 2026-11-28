@@ -77,6 +77,9 @@ internal sealed class TweenOptions
     [Category("2. Goal"), Description("Size at the goal: 1 = as it is, 1.05 = 5% bigger, 0.8 = smaller. From the widget's centre."), Range(0, 10)] public float Scale { get; set; } = 1;
     [Category("2. Goal"), Description("See-through-ness at the goal: 1 = as it is, 0 = invisible."), Range(0, 1)] public float Opacity { get; set; } = 1;
     [Category("2. Goal"), DisplayName("Rotate"), Description("Degrees turned at the goal (clockwise)."), Range(-3600, 3600)] public float Rotate { get; set; }
+    [Category("2. Goal"), DisplayName("Tilt X"), Description("Extra 3D lean at the goal, in degrees (positive = top goes back)."), Range(-80, 80)] public float TiltX { get; set; }
+    [Category("2. Goal"), DisplayName("Tilt Y"), Description("Extra 3D turn at the goal, in degrees (positive = right side goes back)."), Range(-80, 80)] public float TiltY { get; set; }
+    [Category("2. Goal"), DisplayName("Face front"), Description("At the goal the widget's own tilt (Transform > Tilt X / Y) is undone, so a tilted panel turns to face you (e.g. on hover).")] public bool Untilt { get; set; }
 
     public override string ToString() => $"{Name}  ({Trigger}{(Target.Length > 0 ? " · " + Target : "")})";
 
@@ -89,6 +92,8 @@ internal sealed class TweenOptions
         ("Pop in (appear)", () => new TweenOptions { Name = "pop in", Trigger = "appear", Time = 0.5f, Style = "back", Scale = 0.85f, Opacity = 0 }),
         ("Lift on hover", () => new TweenOptions { Name = "lift", Trigger = "hover", Time = 0.18f, Style = "quad", MoveY = -4 }),
         ("Grow on hover", () => new TweenOptions { Name = "grow", Trigger = "hover", Time = 0.2f, Style = "back", Scale = 1.04f }),
+        ("Face me on hover (untilt)", () => new TweenOptions { Name = "face me", Trigger = "hover", Time = 0.3f, Style = "quart", Untilt = true, Scale = 1.02f }),
+        ("Swing in (appear)", () => new TweenOptions { Name = "swing in", Trigger = "appear", Time = 0.7f, Style = "back", TiltY = 60, Opacity = 0 }),
         ("Bounce on click", () => new TweenOptions { Name = "press", Trigger = "click", Time = 0.12f, Style = "quad", Scale = 0.95f }),
         ("Bob up and down (loop)", () => new TweenOptions { Name = "bob", Trigger = "loop", Time = 1.6f, Style = "sine", Direction = "inout", MoveY = -6 }),
         ("Breathe (loop)", () => new TweenOptions { Name = "breathe", Trigger = "loop", Time = 2.2f, Style = "sine", Direction = "inout", Opacity = 0.65f }),
@@ -142,6 +147,7 @@ internal sealed class Animator
     }
 
     readonly List<Live> live = new();
+    IReadOnlyList<Widget> all = Array.Empty<Widget>();
     float startAt = -1, now;
     public bool Running { get; private set; }
     public bool HasHover => live.Any(l => l.T.Trigger == "hover");
@@ -158,6 +164,7 @@ internal sealed class Animator
         bool same = sig == bound && bound.Length > 0;
         bound = sig;
         float keepStart = startAt;
+        all = widgets;
         live.Clear();
         foreach (var t in tweens)
         {
@@ -184,11 +191,32 @@ internal sealed class Animator
     public void Clicked(Widget w) { foreach (var l in live) if (l.W == w && l.T.Trigger == "click") { l.ClickAt = now; Running = true; } }
 
     /// Moves time on and updates hover progress. `over(w)` = the mouse is over that widget.
-    public void Step(float time, float dt, Func<Widget, bool> over)
+    readonly Dictionary<Widget, (float x, float y)> follow = new();
+
+    public void Step(float time, float dt, Func<Widget, bool> over, float mouseX = -1e6f, float mouseY = -1e6f)
     {
         now = time;
         if (startAt < 0) startAt = time;
         bool running = false;
+        // Tilt to mouse: lean towards the mouse while it's over the widget, eased, back to flat after
+        foreach (var w in all)
+        {
+            float f = w.Opt?.TiltFollow ?? 0;
+            if (f <= 0) { follow.Remove(w); continue; }
+            float tx = 0, ty = 0;
+            if (over(w) && !w.Bounds.IsEmpty)
+            {
+                float nx = Math.Clamp((mouseX - (w.Bounds.X + w.Bounds.Width / 2)) / Math.Max(1, w.Bounds.Width / 2), -1, 1);
+                float ny = Math.Clamp((mouseY - (w.Bounds.Y + w.Bounds.Height / 2)) / Math.Max(1, w.Bounds.Height / 2), -1, 1);
+                ty = nx * f; tx = -ny * f;   // the side under the mouse goes back, as if pressed
+            }
+            var cur = follow.TryGetValue(w, out var v) ? v : (0f, 0f);
+            float k = Math.Min(1, dt * 10);
+            var next = (cur.Item1 + (tx - cur.Item1) * k, cur.Item2 + (ty - cur.Item2) * k);
+            if (Math.Abs(next.Item1 - tx) > 0.05f || Math.Abs(next.Item2 - ty) > 0.05f) running = true;
+            else next = (tx, ty);
+            follow[w] = next;
+        }
         foreach (var l in live)
         {
             var t = l.T;
@@ -248,10 +276,14 @@ internal sealed class Animator
         }
     }
 
-    /// The widget's look now: move, size, turn (degrees) and see-through-ness. Identity = (0, 0, 1, 0, 1).
-    public (float x, float y, float scale, float rotate, float opacity) For(Widget w)
+    public readonly record struct Look(float X, float Y, float Scale, float Rotate, float Opacity, float TiltX, float TiltY, float Depth);
+
+    /// The widget's look now: its own Transform options plus every tween playing on it.
+    public Look For(Widget w)
     {
-        float x = 0, y = 0, s = 1, r = 0, o = 1;
+        var o = w.Opt;
+        float x = 0, y = 0, s = 1, r = o?.Rotate ?? 0, a = o?.Alpha ?? 1, tx = o?.TiltX ?? 0, ty = o?.TiltY ?? 0;
+        float baseTx = tx, baseTy = ty;
         foreach (var l in live)
         {
             if (l.W != w) continue;
@@ -260,38 +292,72 @@ internal sealed class Animator
             var t = l.T;
             x += t.MoveX * p; y += t.MoveY * p; r += t.Rotate * p;
             s *= 1 + (t.Scale - 1) * p;
-            o *= Math.Clamp(1 + (t.Opacity - 1) * p, 0, 1);
+            a *= Math.Clamp(1 + (t.Opacity - 1) * p, 0, 1);
+            tx += t.TiltX * p; ty += t.TiltY * p;
+            if (t.Untilt) { tx -= baseTx * p; ty -= baseTy * p; }
         }
-        return (x, y, s, r, o);
+        if (follow.TryGetValue(w, out var fv)) { tx += fv.x; ty += fv.y; }
+        return new Look(x, y, s, r, a, tx, ty, o?.Depth ?? 1600);
     }
 
     /// Draws `draw` with the widget's animated look applied (transform and opacity layer).
     public void Apply(Canvas c, Widget w, Action draw)
     {
-        var (x, y, s, r, o) = For(w);
+        var lk = For(w);
+        float o = lk.Opacity;
         if (o <= 0.001f) return;
-        bool moved = x != 0 || y != 0 || s != 1 || r != 0;
+        bool moved = lk.X != 0 || lk.Y != 0 || lk.Scale != 1 || lk.Rotate != 0;
+        bool tilted = Math.Abs(lk.TiltX) > 0.05f || Math.Abs(lk.TiltY) > 0.05f;
         var dc = c.Dc;
         var t0 = dc.Transform;
+        var b = w.Bounds;
+        var centre = new Vector2(b.X + b.Width / 2, b.Y + b.Height / 2);
         if (moved)
-        {
-            var b = w.Bounds;
-            var centre = new Vector2(b.X + b.Width / 2, b.Y + b.Height / 2);
-            dc.Transform = Matrix3x2.CreateTranslation(-centre) * Matrix3x2.CreateScale(Math.Max(0.001f, s)) * Matrix3x2.CreateRotation(r * MathF.PI / 180)
-                           * Matrix3x2.CreateTranslation(centre + new Vector2(x, y)) * t0;
-        }
+            dc.Transform = Matrix3x2.CreateTranslation(-centre) * Matrix3x2.CreateScale(Math.Max(0.001f, lk.Scale)) * Matrix3x2.CreateRotation(lk.Rotate * MathF.PI / 180)
+                           * Matrix3x2.CreateTranslation(centre + new Vector2(lk.X, lk.Y)) * t0;
         bool fade = o < 0.999f;
-        if (fade)
-            dc.PushLayer(new Vortice.Direct2D1.LayerParameters1
-            {
-                ContentBounds = new Vortice.Mathematics.Rect(-100000, -100000, 200000, 200000), Opacity = o, MaskTransform = Matrix3x2.Identity,
-                MaskAntialiasMode = Vortice.Direct2D1.AntialiasMode.PerPrimitive,
-            }, null);
-        try { draw(); }
-        finally
+        void Fade() => dc.PushLayer(new Vortice.Direct2D1.LayerParameters1
         {
-            if (fade) dc.PopLayer();
-            dc.Transform = t0;
+            ContentBounds = new Vortice.Mathematics.Rect(-100000, -100000, 200000, 200000), Opacity = o, MaskTransform = Matrix3x2.Identity,
+            MaskAntialiasMode = Vortice.Direct2D1.AntialiasMode.PerPrimitive,
+        }, null);
+        try
+        {
+            if (!tilted)
+            {
+                if (fade) Fade();
+                try { draw(); } finally { if (fade) dc.PopLayer(); }
+                return;
+            }
+            // 3D tilt: draw the widget into a command list, then through Direct2D's perspective effect
+            var target = dc.Target;
+            using var list = dc.CreateCommandList();
+            dc.Target = list;
+            try { draw(); }
+            finally { list.Close(); dc.Target = target; }
+            var m = dc.Transform;   // the list holds the drawing already placed: draw it without moving it again
+            dc.Transform = Matrix3x2.Identity;
+            // the middle it turns around: its own, or that of the widget named in Tilt around
+            var around = centre;
+            if (w.Opt is { TiltAround.Length: > 0 } wo)
+            {
+                var host = all.FirstOrDefault(x => x.Opt != null && x.Opt.Name.Equals(wo.TiltAround, StringComparison.OrdinalIgnoreCase));
+                if (host != null && !host.Bounds.IsEmpty) around = new Vector2(host.Bounds.X + host.Bounds.Width / 2, host.Bounds.Y + host.Bounds.Height / 2);
+            }
+            var origin = Vector2.Transform(around + new Vector2(lk.X, lk.Y), t0);
+            using var fx = new Vortice.Direct2D1.Effects.PerspectiveTransform3D(dc);
+            fx.SetInput(0, list, true);
+            fx.Depth = Math.Max(100, lk.Depth) * Math.Max(0.25f, t0.M11);
+            fx.PerspectiveOrigin = origin;
+            fx.RotationOrigin = new Vector3(origin, 0);
+            fx.Rotation = new Vector3(-lk.TiltX, lk.TiltY, 0);
+            if (fade) Fade();
+            try { dc.DrawImage(fx); } finally { if (fade) dc.PopLayer(); }
+            dc.Transform = m;
         }
+        finally { dc.Transform = t0; }
     }
+
+    /// True if any widget has its own tilt / turn / opacity (then it's drawn through Apply even without tweens).
+    public static bool Shaped(Widget w) => w.Opt is { } o && (o.TiltX != 0 || o.TiltY != 0 || o.Rotate != 0 || o.Alpha < 1);
 }

@@ -30,15 +30,21 @@ internal sealed class ShortcutsWidget : Widget
     public ShortcutsWidget(ShortcutsOptions o, Theme theme, List<Shortcut> all)
     {
         this.o = o; this.theme = theme;
-        items = all.Where(s => o.Group.Length == 0 || s.Group.Equals(o.Group, StringComparison.OrdinalIgnoreCase))
-                   .Select(s => new Item { S = s }).ToList();
+        var picked = o.Names.Length > 0
+            ? o.Names.Select(n => all.FirstOrDefault(s => s.Name.Equals(n.Trim(), StringComparison.OrdinalIgnoreCase))).OfType<Shortcut>()
+            : all.Where(s => o.Group.Length == 0 || s.Group.Equals(o.Group, StringComparison.OrdinalIgnoreCase));
+        items = picked.Select(s => new Item { S = s }).ToList();
         tint = new Gradient(theme, o.TintColors);
         mono = theme[o.IconColor]; label = theme[o.LabelColor]; hover = theme[o.HoverColor];
         var ui = theme.Options.Ui;
         panel = o.BoxColor(theme); border = o.BoxBorder(theme); text = theme[ui.TextColor]; accent = theme[ui.AccentColor];
     }
 
-    public override bool Animated => loadedCount < items.Count;   // keep drawing until every icon is in
+    public override bool Animated => loadedCount < items.Count || magMoving;   // keep drawing until every icon is in
+    public override bool FollowsMouse => base.FollowsMouse || o.Magnify > 1.01f;
+    float[] mags = Array.Empty<float>();
+    float magAt = -1;
+    bool magMoving;
     public override string Signature(WidgetEnv e) => $"{Hover}|{loadedCount}/{items.Count}";
 
     string Style(bool smooth) => o.IconStyle == "auto" ? (smooth ? "original" : "ascii") : o.IconStyle;
@@ -114,11 +120,21 @@ internal sealed class ShortcutsWidget : Widget
         }
     }
 
+    /// How far magnified icons reach above their place.
+    float Grow => !terminal && o.Magnify > 1.01f ? o.IconSize * (o.Magnify - 1) + 6 : 0;
+
     public override int HitTest(float x, float y)
     {
-        for (int i = 0; i < items.Count; i++) if (items[i].Rect.Contains(x, y)) return i;
+        float g = Grow;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var r = items[i].Rect;
+            if (new RectangleF(r.X, r.Y - g, r.Width, r.Height + g).Contains(x, y)) return i;
+        }
         return -1;
     }
+
+    public override bool Covers(float x, float y) { float g = Grow; return new RectangleF(Bounds.X, Bounds.Y - g, Bounds.Width, Bounds.Height + g).Contains(x, y); }
 
     public override void Click(int item, int count, WidgetEnv e)
     {
@@ -219,10 +235,28 @@ internal sealed class ShortcutsWidget : Widget
                 c.Text(o.Title, new RectangleF(Bounds.X + ui.Padding, Bounds.Y + ui.Padding * 0.7f, Bounds.Width - 2 * ui.Padding, ui.FontSize * 1.6f), accent, ui.Font, ui.FontSize, ui.BoldTitles);
         }
         if (style == "ascii") return;  // drawn with characters
+        // magnify: each icon eases towards its size for where the mouse is
+        if (mags.Length != items.Count) mags = Enumerable.Repeat(1f, items.Count).ToArray();
+        float mdt = magAt < 0 ? 0 : Math.Clamp(e.Time - magAt, 0, 0.1f);
+        magAt = e.Time;
+        magMoving = false;
+        (int i, RectangleF r)? tag = null;
         for (int i = 0; i < items.Count; i++)
         {
             var it = items[i];
             bool hot = i == Hover;
+            if (!terminal && o.Magnify > 1.01f)
+            {
+                float target = 1;
+                if (MouseOver && e.MouseOn)
+                {
+                    float d = MathF.Abs(e.MouseX - (it.Rect.X + it.Rect.Width / 2));
+                    target = 1 + (o.Magnify - 1) * Math.Max(0, 1 - d / o.MagnifyRange);
+                }
+                float k = mdt <= 0 ? 1 : Math.Min(1, mdt * 14);
+                mags[i] += (target - mags[i]) * k;
+                if (Math.Abs(mags[i] - target) > 0.004f) magMoving = true; else mags[i] = target;
+            }
             RectangleF iconR;
             if (terminal)
             {
@@ -232,8 +266,11 @@ internal sealed class ShortcutsWidget : Widget
             }
             else
             {
-                if (hot) c.Fill(it.Rect, hover, ui.CornerRadius * 0.6f, 0.22f);
-                iconR = new RectangleF(it.Rect.X + (it.Rect.Width - o.IconSize) / 2, it.Rect.Y + 5, o.IconSize, o.IconSize);
+                float m = o.Magnify > 1.01f ? mags[i] : 1;
+                if (hot && m <= 1.01f && o.Magnify <= 1.01f) c.Fill(it.Rect, hover, ui.CornerRadius * 0.6f, 0.22f);
+                float sz = o.IconSize * m;   // grows upwards from the icon's bottom edge
+                iconR = new RectangleF(it.Rect.X + (it.Rect.Width - sz) / 2, it.Rect.Y + 5 + o.IconSize - sz, sz, sz);
+                if (hot && o.HoverLabel) tag = (i, iconR);
             }
             if (it.Px != null)
             {
@@ -252,6 +289,15 @@ internal sealed class ShortcutsWidget : Widget
                 var lr = new RectangleF(it.Rect.X + 2, iconR.Bottom + 4, it.Rect.Width - 4, o.LabelLines * lineH + 2);
                 c.Text(it.S.ToString(), lr, hot ? text : label, ui.Font, ui.FontSize, false, "center", o.LabelLines > 1);
             }
+        }
+        if (tag is { } tg)
+        {
+            var name = items[tg.i].S.ToString();
+            float fs = ui.FontSize, tw = c.Measure(name, ui.Font, fs, false) + 18, th = fs * 1.9f;
+            var r = new RectangleF(tg.r.X + tg.r.Width / 2 - tw / 2, tg.r.Y - th - 8, tw, th);
+            c.Fill(r, e.Theme[o.TagColor], th * 0.3f, 0.95f);
+            c.Stroke(r, e.Theme[o.TagBorder], 1, th * 0.3f);
+            c.Text(name, new RectangleF(r.X, r.Y + (th - fs * 1.4f) / 2, r.Width, fs * 1.5f), text, ui.Font, fs, false, "center");
         }
     }
 }

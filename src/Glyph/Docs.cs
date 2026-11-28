@@ -263,6 +263,8 @@ only redraws when something changes, like the mouse moving over a shortcut.
 Smooth themes can lay up to two **patterns** over the whole backdrop (Wallpaper > Backdrop > *Pattern* and
 *Pattern 2*): dots, crosses, scanlines, a grid, vertical or diagonal lines, crosshatch, each with its own colour,
 see-through-ness, spacing and thickness. A dot grid with faint scanlines over it gives a printed-paper look.
+*Tint* lays a colour over the picture or gradient (*Tint amount*, and *Tint fade* to make it strongest at the bottom
+or top), e.g. a red-violet wash over a city photo at night.
 
 ## 6b. The bar
 
@@ -346,7 +348,8 @@ preview: type a sample title and pick *Show as* panel, window, bar module or but
 - **Border**: colour, width, dashes, only some sides, and a second **inner border**.
 - **Title**: *plain* (top-left inside), *bar* (a strip across the top), *tab* (a tab sticking up from the top edge,
   with a slanted side), *line* (the title with a line running to the right) or *above* (over the box). Its font,
-  size, capitals and letter spacing, and a second text on the right (*Title right* on a widget, e.g. `LIVE`).
+  size, capitals and letter spacing, and a second text on the right (*Title right* on a widget, e.g. `LIVE`). *Line
+  ticks* puts small ruler marks along a line or above title's line.
 - **Marks**: corner brackets ⌜ ⌟ on some or all corners, small filled **corner squares** on all four corners, a
   filled triangle in one corner, a thick **stripe** on one
   side, a block of **hatch** lines ////// at a corner, **ruler ticks** along a side, a soft **glow** and a shadow.
@@ -379,6 +382,23 @@ on the right, `height` from *Offset Y* at the top to *Offset Y* at the bottom, `
 stretched to `both` with a frame is a border around the whole screen. Text widgets also have *Letter spacing* and a
 *Text shadow* (the text printed again a little lower right); the clock has letter spacing for both lines.
 
+Every widget has **Transform** options (smooth style): *Tilt X / Y* lean it in 3D (Tilt Y 14 = its right side goes
+back, -14 = its left side; *Depth* = how strong the perspective is), *Rotate* turns it flat (e.g. -90 for sideways
+text), and *Opacity* fades the whole widget (0.12 = a faint watermark). *Tilt around* names another widget: widgets
+that share a Tilt and the same Tilt around lean together as one surface (e.g. cards on a tilted board).
+
+**Things that answer the mouse** (smooth style), on any widget or theme:
+- *Tilt to mouse* (Transform): the widget leans towards the mouse while it's over it, as if pressed, and settles back.
+- A frame's *Spotlight*: a soft light follows the mouse across the box and lights up its edge near the mouse
+  (*Spotlight size / strength / edge*). Every box drawn with that frame gets it.
+- *Hover text* (info panels): extra lines, with {values}, that the panel grows to show while the mouse is over it
+  (*Reveal time*); a growing panel is drawn over its neighbours.
+- Shortcuts panels: *Magnify* swells the icons under the mouse like a dock, and *Name on hover* shows the name in a
+  small tag above the icon.
+- **toggles**: a grid of quick buttons (icon | label | click action | when it's on, e.g. `{muted}`, `{bluetooth}`):
+  buttons rise and glow under the mouse (*Hover lift*, *Hover time*) and are lit while on (*On frame*, *On colour*).
+- Hover tweens (6i) and the menu's wipe, as before.
+
 - **menu**: a whole menu screen made from your shortcut groups (5). The groups are tabs across the top (with the
   group's icon in a little box, spread across the width or packed), a ruled line under them (`band` = line, dashes
   and dot triangles), the chosen group's name in big letters with its subtitle and sentence, its shortcuts as a list
@@ -386,7 +406,16 @@ stretched to `both` with a frame is a border around the whole screen. Text widge
   A click on a tab or a shortcut chooses it; a double click opens a shortcut (or one click with *Open with* =
   click). The dark fill slides in under the mouse over *Hover wipe* milliseconds. Scroll over the list when it's
   long, or over the tabs to change tab. Tabs and plates use plain colours (Tab colour, Active colour…) or frames
-  (*Tab frame*, *Item frame*, *Details frame*).
+  (*Tab frame*, *Item frame*, *Details frame*), and *Active tab frame* / *Active item frame* fade in a second frame
+  over the chosen one (e.g. a bright outline). *Tab layout* `column` puts the tabs in a column down the left and *Tab
+  style* `icons` shows just each group's icon; *List layout* `cards` shows the shortcuts as a grid of cards (icon,
+  name, description) and *App icons* uses each shortcut's own icon. *Heading text* replaces the tab's name with your
+  own words and values, e.g. `{greeting}, {user}`; *Heading line* the small line under it. The menu draws its *Frame*
+  (auto = the theme's panel frame) behind everything, with *Width* / *Height* when it isn't stretched.
+- **themes**: cards for your themes, each with its wallpaper as a picture, a few of its colours (*Colour dots*) and its
+  name; the one in use is marked, and clicking another switches to it.
+- **shortcuts** with *Names* shows just those shortcuts, in that order: with no panel, no labels and a single row it's
+  a dock.
 - **divider**: a line across or down the screen: solid, dashed, dotted, double, or `band`. With *Stretch* it runs
   from edge to edge.
 
@@ -410,6 +439,7 @@ Anywhere you can type text for the bar or a widget, you can use:
 | `{media_title}` `{media_artist}` `{media_album}` `{media_app}` `{media_state}` `{media_icon}` `{media_position}` `{media_length}` | what's playing |
 | `{window}` `{window:40}` | the active window's title (`:40` = at most 40 characters) |
 | `{window_app}` | the program whose window is in front (e.g. Firefox) |
+| `{greeting}` | Good morning / Good afternoon / Good evening / Good night, by the time of day |
 | `{desktop}` `{desktops}` `{desktop_name}` | virtual desktop number, count, name |
 | `{tiling}` | the tiling layout (dwindle, master, columns, rows, monocle) or off |
 | `{wifi}` `{wifi_signal}` `{network}` | the Wi-Fi network's name, its signal 0–100, and wifi / ethernet / mobile / none |
@@ -513,7 +543,8 @@ uses shows *taken by another program*: pick other keys. Other programs can run a
 Widgets can move, grow, turn and fade with **tweens**, the same idea as Roblox's TweenService: a tween goes from
 how the widget normally looks to a **goal** (*Move X / Y* in pixels, *Scale*, *Rotate* in degrees, *Opacity*) over
 a *Time*, with an **easing style** (`linear`, `sine`, `quad`, `cubic`, `quart`, `quint`, `exponential`, `circular`,
-`back`, `elastic`, `bounce`) and **direction** (`in`, `out`, `inout`), after a *Delay*. The **trigger** says when:
+`back`, `elastic`, `bounce`) and **direction** (`in`, `out`, `inout`), after a *Delay*. Goals can also *Tilt X / Y* in
+3D, and *Face front* undoes the widget's own tilt (a tilted panel turns to face you on hover). The **trigger** says when:
 
 - `appear`: when Glyph starts (or the tweens change), coming in from the goal: Move Y 40 + Opacity 0 = rises and
   fades in. Saving other settings doesn't replay it.

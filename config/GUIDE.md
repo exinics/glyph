@@ -166,6 +166,8 @@ only redraws when something changes, like the mouse moving over a shortcut.
 Smooth themes can lay up to two **patterns** over the whole backdrop (Wallpaper > Backdrop > *Pattern* and
 *Pattern 2*): dots, crosses, scanlines, a grid, vertical or diagonal lines, crosshatch, each with its own colour,
 see-through-ness, spacing and thickness. A dot grid with faint scanlines over it gives a printed-paper look.
+*Tint* lays a colour over the picture or gradient (*Tint amount*, and *Tint fade* to make it strongest at the bottom
+or top), e.g. a red-violet wash over a city photo at night.
 
 ## 6b. The bar
 
@@ -249,7 +251,8 @@ preview: type a sample title and pick *Show as* panel, window, bar module or but
 - **Border**: colour, width, dashes, only some sides, and a second **inner border**.
 - **Title**: *plain* (top-left inside), *bar* (a strip across the top), *tab* (a tab sticking up from the top edge,
   with a slanted side), *line* (the title with a line running to the right) or *above* (over the box). Its font,
-  size, capitals and letter spacing, and a second text on the right (*Title right* on a widget, e.g. `LIVE`).
+  size, capitals and letter spacing, and a second text on the right (*Title right* on a widget, e.g. `LIVE`). *Line
+  ticks* puts small ruler marks along a line or above title's line.
 - **Marks**: corner brackets ⌜ ⌟ on some or all corners, small filled **corner squares** on all four corners, a
   filled triangle in one corner, a thick **stripe** on one
   side, a block of **hatch** lines ////// at a corner, **ruler ticks** along a side, a soft **glow** and a shadow.
@@ -282,6 +285,23 @@ on the right, `height` from *Offset Y* at the top to *Offset Y* at the bottom, `
 stretched to `both` with a frame is a border around the whole screen. Text widgets also have *Letter spacing* and a
 *Text shadow* (the text printed again a little lower right); the clock has letter spacing for both lines.
 
+Every widget has **Transform** options (smooth style): *Tilt X / Y* lean it in 3D (Tilt Y 14 = its right side goes
+back, -14 = its left side; *Depth* = how strong the perspective is), *Rotate* turns it flat (e.g. -90 for sideways
+text), and *Opacity* fades the whole widget (0.12 = a faint watermark). *Tilt around* names another widget: widgets
+that share a Tilt and the same Tilt around lean together as one surface (e.g. cards on a tilted board).
+
+**Things that answer the mouse** (smooth style), on any widget or theme:
+- *Tilt to mouse* (Transform): the widget leans towards the mouse while it's over it, as if pressed, and settles back.
+- A frame's *Spotlight*: a soft light follows the mouse across the box and lights up its edge near the mouse
+  (*Spotlight size / strength / edge*). Every box drawn with that frame gets it.
+- *Hover text* (info panels): extra lines, with {values}, that the panel grows to show while the mouse is over it
+  (*Reveal time*); a growing panel is drawn over its neighbours.
+- Shortcuts panels: *Magnify* swells the icons under the mouse like a dock, and *Name on hover* shows the name in a
+  small tag above the icon.
+- **toggles**: a grid of quick buttons (icon | label | click action | when it's on, e.g. `{muted}`, `{bluetooth}`):
+  buttons rise and glow under the mouse (*Hover lift*, *Hover time*) and are lit while on (*On frame*, *On colour*).
+- Hover tweens (6i) and the menu's wipe, as before.
+
 - **menu**: a whole menu screen made from your shortcut groups (5). The groups are tabs across the top (with the
   group's icon in a little box, spread across the width or packed), a ruled line under them (`band` = line, dashes
   and dot triangles), the chosen group's name in big letters with its subtitle and sentence, its shortcuts as a list
@@ -289,7 +309,16 @@ stretched to `both` with a frame is a border around the whole screen. Text widge
   A click on a tab or a shortcut chooses it; a double click opens a shortcut (or one click with *Open with* =
   click). The dark fill slides in under the mouse over *Hover wipe* milliseconds. Scroll over the list when it's
   long, or over the tabs to change tab. Tabs and plates use plain colours (Tab colour, Active colour…) or frames
-  (*Tab frame*, *Item frame*, *Details frame*).
+  (*Tab frame*, *Item frame*, *Details frame*), and *Active tab frame* / *Active item frame* fade in a second frame
+  over the chosen one (e.g. a bright outline). *Tab layout* `column` puts the tabs in a column down the left and *Tab
+  style* `icons` shows just each group's icon; *List layout* `cards` shows the shortcuts as a grid of cards (icon,
+  name, description) and *App icons* uses each shortcut's own icon. *Heading text* replaces the tab's name with your
+  own words and values, e.g. `{greeting}, {user}`; *Heading line* the small line under it. The menu draws its *Frame*
+  (auto = the theme's panel frame) behind everything, with *Width* / *Height* when it isn't stretched.
+- **themes**: cards for your themes, each with its wallpaper as a picture, a few of its colours (*Colour dots*) and its
+  name; the one in use is marked, and clicking another switches to it.
+- **shortcuts** with *Names* shows just those shortcuts, in that order: with no panel, no labels and a single row it's
+  a dock.
 - **divider**: a line across or down the screen: solid, dashed, dotted, double, or `band`. With *Stretch* it runs
   from edge to edge.
 
@@ -313,6 +342,7 @@ Anywhere you can type text for the bar or a widget, you can use:
 | `{media_title}` `{media_artist}` `{media_album}` `{media_app}` `{media_state}` `{media_icon}` `{media_position}` `{media_length}` | what's playing |
 | `{window}` `{window:40}` | the active window's title (`:40` = at most 40 characters) |
 | `{window_app}` | the program whose window is in front (e.g. Firefox) |
+| `{greeting}` | Good morning / Good afternoon / Good evening / Good night, by the time of day |
 | `{desktop}` `{desktops}` `{desktop_name}` | virtual desktop number, count, name |
 | `{tiling}` | the tiling layout (dwindle, master, columns, rows, monocle) or off |
 | `{wifi}` `{wifi_signal}` `{network}` | the Wi-Fi network's name, its signal 0–100, and wifi / ethernet / mobile / none |
@@ -416,7 +446,8 @@ uses shows *taken by another program*: pick other keys. Other programs can run a
 Widgets can move, grow, turn and fade with **tweens**, the same idea as Roblox's TweenService: a tween goes from
 how the widget normally looks to a **goal** (*Move X / Y* in pixels, *Scale*, *Rotate* in degrees, *Opacity*) over
 a *Time*, with an **easing style** (`linear`, `sine`, `quad`, `cubic`, `quart`, `quint`, `exponential`, `circular`,
-`back`, `elastic`, `bounce`) and **direction** (`in`, `out`, `inout`), after a *Delay*. The **trigger** says when:
+`back`, `elastic`, `bounce`) and **direction** (`in`, `out`, `inout`), after a *Delay*. Goals can also *Tilt X / Y* in
+3D, and *Face front* undoes the widget's own tilt (a tilted panel turns to face you on hover). The **trigger** says when:
 
 - `appear`: when Glyph starts (or the tweens change), coming in from the goal: Move Y 40 + Opacity 0 = rises and
   fades in. Saving other settings doesn't replay it.
@@ -778,6 +809,10 @@ Box designs, picked by name (see 6b5).
 | `hover_fill` | `"none"` | colour name or hex | **Hover fill.** Fill colour under the mouse, when it does something on click. none = no change. |
 | `text_color` | `"none"` | colour name or hex | **Text colour.** Colour of the text inside (bar modules, buttons). none = the text's own colour. Set it for dark fills on a light theme (or the other way round). |
 | `hover_text` | `"none"` | colour name or hex | **Hover text.** Colour of the text inside (bar modules, buttons) while the mouse is over it. none = unchanged. Set it when Hover fill is close to the text colour. |
+| `spotlight` | `"none"` | colour name or hex | A soft light that follows the mouse across the box and brightens its edge near the mouse. none = no spotlight. Smooth style. |
+| `spotlight_size` | `180` | 10 to 2000 | **Spotlight size.** Radius of the light, in pixels. |
+| `spotlight_strength` | `0.14` | 0 to 1 | **Spotlight strength.** How bright the light is inside the box. |
+| `spotlight_edge` | `0.8` | 0 to 1 | **Spotlight edge.** How much the box's edge lights up near the mouse. |
 | `hover_wipe` | `0` | 0 to 2000 | **Hover wipe.** The hover fill slides in from the left over this many milliseconds instead of appearing at once. 0 = at once. Used by menus and lists that animate. |
 | `border` | `"line"` | colour name or hex | Border colour. none = no border. |
 | `border_width` | `1` | 0 to 50 | **Border width.**  |
@@ -799,6 +834,8 @@ Box designs, picked by name (see 6b5).
 | `header_opacity` | `1` | 0 to 1 | **Strip opacity.**  |
 | `header_height` | `0` | 0 to 200 | **Strip height.** bar and tab: height of the strip. 0 = fit the title. |
 | `header_line` | `"none"` | colour name or hex | **Line under title.** A line under the title strip. none = no line. |
+| `line_ticks` | `0` | 0 to 60 | **Line ticks.** line and above titles: this many small upright marks spread along the title's line (the ends get one too), like a ruler. 0 = a plain line. |
+| `line_tick_height` | `7` | 1 to 60 | **Tick height.** Height of the line's marks, in pixels. |
 | `tab_width` | `0` | 0 to 2000 | **Tab width.** tab: width of the tab. 0 = fit the title. |
 | `tab_slant` | `10` | 0 to 200 | **Tab slant.** tab: how far the tab's right side leans out, in pixels. |
 | `tab_offset` | `0` | 0 to 2000 | **Tab offset.** tab: distance from the box's left edge. |
@@ -851,6 +888,9 @@ Animations for widgets (see 6i).
 | `scale` | `1` | 0 to 10 | Size at the goal: 1 = as it is, 1.05 = 5% bigger, 0.8 = smaller. From the widget's centre. |
 | `opacity` | `1` | 0 to 1 | See-through-ness at the goal: 1 = as it is, 0 = invisible. |
 | `rotate` | `0` | -3600 to 3600 | **Rotate.** Degrees turned at the goal (clockwise). |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Extra 3D lean at the goal, in degrees (positive = top goes back). |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Extra 3D turn at the goal, in degrees (positive = right side goes back). |
+| `untilt` | `false` | true, false | **Face front.** At the goal the widget's own tilt (Transform > Tilt X / Y) is undone, so a tilted panel turns to face you (e.g. on hover). |
 
 ### wallpaper.toml (top)
 
@@ -870,6 +910,9 @@ Animations for widgets (see 6i).
 | `file` | `""` |  | Picture file (PNG/JPG). A file name is looked for in the theme folder and config\images. |
 | `fit` | `"cover"` | cover, contain, stretch, center | How the picture fills the screen. |
 | `dim` | `0` | 0 to 1 | Darken the picture (0 = not at all, 1 = black). |
+| `tint` | `"none"` | colour name or hex | **Tint.** A colour laid over the picture or gradient (smooth themes), e.g. a red or violet wash for a night mood. none = no tint. |
+| `tint_amount` | `0.25` | 0 to 1 | **Tint amount.** How strong the tint is: 0 = none, 1 = only the tint colour. |
+| `tint_fade` | `"none"` | none, bottom, top | **Tint fade.** Fade the tint towards the top or bottom of the screen: none = even, bottom = strongest at the bottom, top = strongest at the top. |
 | `pattern` | `"none"` | none, scanlines, grid, dots, crosses, diagonal, crosshatch, vlines | **Pattern.** A pattern drawn over the whole backdrop (smooth themes): dots, lines, a grid… none = no pattern. |
 | `pattern_color` | `"line"` | colour name or hex | **Pattern colour.**  |
 | `pattern_opacity` | `0.5` | 0 to 1 | **Pattern opacity.**  |
@@ -1340,6 +1383,13 @@ your shortcuts in a grid
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1350,6 +1400,7 @@ your shortcuts in a grid
 | `title` | `""` |  | Title shown on the panel. Empty = none. |
 | `panel` | `true` | true, false | Draw a panel behind the shortcuts. |
 | `group` | `""` |  | Only show shortcuts in this group. Empty = all shortcuts. |
+| `names` | `[]` |  | Or: just these shortcuts, by name, in this order (e.g. for a dock). Empty = use Group. |
 | `columns` | `3` | 1 to 50 | Number of columns. |
 | `launch` | `"double_click"` | double_click, click | **Open with.** double_click like Windows, or a single click. |
 | `icon_size` | `48` | 12 to 512 | **Icon size.** In pixels. |
@@ -1359,6 +1410,11 @@ your shortcuts in a grid
 | `ascii_mode` | `"braille"` | braille, blocks | **ASCII kind.** For the ascii style: braille = fine dots, blocks = chunky pixels. |
 | `tint_colors` | `["accent_dim", "accent", "bright"]` | colour name or hex | **Tint colours.** Dark to bright, for the tint and ascii styles. |
 | `icon_color` | `"accent"` | colour name or hex | **Mono colour.** For the mono style. |
+| `magnify` | `1` | 1 to 4 | Smooth style: icons swell under the mouse, the nearest most (like a dock): 1 = off, 1.6 = up to 60% bigger. |
+| `magnify_range` | `110` | 20 to 1000 | **Magnify reach.** How far from the mouse icons still grow, in pixels. |
+| `hover_label` | `false` | true, false | **Name on hover.** Smooth style: show the name of the icon under the mouse in a little tag above it (handy with labels off). |
+| `tag_color` | `"surface"` | colour name or hex | **Tag colour.** Background of the hover tag. |
+| `tag_border` | `"accent"` | colour name or hex | **Tag border.**  |
 | `show_labels` | `true` | true, false | **Show labels.**  |
 | `label_lines` | `2` | 1 to 3 | **Label lines.** How many lines a long name may take. |
 | `label_color` | `"text"` | colour name or hex | **Label colour.**  |
@@ -1386,6 +1442,13 @@ a big clock and date
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1404,6 +1467,8 @@ a big clock and date
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** Highlights, meters, graphs. |
 | `dim_color` | `"dim"` | colour name or hex | **Dim colour.** Labels and less important text. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `hover_text` | `""` |  | **Hover text.** Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\n = new line). Empty = nothing extra. |
+| `reveal_time` | `220` | 0 to 3000 | **Reveal time.** Milliseconds the panel takes to grow (and shrink back). |
 | `format` | `"{time:HH:mm}"` |  | The big line. {time:HH:mm} = 24-hour, {time:h:mm tt} = 12-hour, add :ss for seconds. |
 | `subtitle` | `"{date:dddd d MMMM}"` |  | The line under it. Empty = none. |
 | `align` | `"center"` | left, center, right |  |
@@ -1438,6 +1503,13 @@ CPU, memory, disk, network with meters and graphs
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1456,6 +1528,8 @@ CPU, memory, disk, network with meters and graphs
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** Highlights, meters, graphs. |
 | `dim_color` | `"dim"` | colour name or hex | **Dim colour.** Labels and less important text. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `hover_text` | `""` |  | **Hover text.** Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\n = new line). Empty = nothing extra. |
+| `reveal_time` | `220` | 0 to 3000 | **Reveal time.** Milliseconds the panel takes to grow (and shrink back). |
 | `show` | `["cpu", "ram", "disk", "net"]` |  | What to show, in order: cpu, ram, disk, net, battery, volume. |
 | `graphs` | `true` | true, false | Draw a history graph under CPU and network. |
 | `graph_rows` | `2` | 1 to 10 | **Graph rows.** Height of the graphs, in lines of text. |
@@ -1486,6 +1560,13 @@ what's playing, with album art and controls
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1504,6 +1585,8 @@ what's playing, with album art and controls
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** Highlights, meters, graphs. |
 | `dim_color` | `"dim"` | colour name or hex | **Dim colour.** Labels and less important text. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `hover_text` | `""` |  | **Hover text.** Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\n = new line). Empty = nothing extra. |
+| `reveal_time` | `220` | 0 to 3000 | **Reveal time.** Milliseconds the panel takes to grow (and shrink back). |
 | `line0` | `""` |  | **Line above.** A small line above the first line, e.g. [dim]{media_app\|upper} // ON AIR[/]. Empty = none. |
 | `line1` | `"{media_title}"` |  | **First line.** Can use {media_title}, {media_artist}, {media_album}, {media_app}, {media_state}. |
 | `line2` | `"{media_artist}"` |  | **Second line.**  |
@@ -1548,6 +1631,13 @@ this month
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1566,6 +1656,8 @@ this month
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** Highlights, meters, graphs. |
 | `dim_color` | `"dim"` | colour name or hex | **Dim colour.** Labels and less important text. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `hover_text` | `""` |  | **Hover text.** Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\n = new line). Empty = nothing extra. |
+| `reveal_time` | `220` | 0 to 3000 | **Reveal time.** Milliseconds the panel takes to grow (and shrink back). |
 | `first_day` | `"monday"` | monday, sunday | **First day.**  |
 | `today_color` | `"accent"` | colour name or hex | **Today colour.**  |
 | `weekend_color` | `"dim"` | colour name or hex | **Weekend colour.**  |
@@ -1593,6 +1685,13 @@ weather and forecast for a city
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1611,6 +1710,8 @@ weather and forecast for a city
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** Highlights, meters, graphs. |
 | `dim_color` | `"dim"` | colour name or hex | **Dim colour.** Labels and less important text. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `hover_text` | `""` |  | **Hover text.** Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\n = new line). Empty = nothing extra. |
+| `reveal_time` | `220` | 0 to 3000 | **Reveal time.** Milliseconds the panel takes to grow (and shrink back). |
 | `city` | `""` |  | City name (looked up online). Or set latitude and longitude instead. |
 | `latitude` | `0` | -90 to 90 |  |
 | `longitude` | `0` | -180 to 180 |  |
@@ -1641,6 +1742,13 @@ any text, with live values like {cpu} and colours
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1659,6 +1767,8 @@ any text, with live values like {cpu} and colours
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** Highlights, meters, graphs. |
 | `dim_color` | `"dim"` | colour name or hex | **Dim colour.** Labels and less important text. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `hover_text` | `""` |  | **Hover text.** Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\n = new line). Empty = nothing extra. |
+| `reveal_time` | `220` | 0 to 3000 | **Reveal time.** Milliseconds the panel takes to grow (and shrink back). |
 | `text` | `'[accent]{user}[/]@{host}\nup {uptime}'` |  | The text. Use {values} like {cpu}, [colour]…[/] for colours, and \n for a new line. |
 | `size` | `"normal"` | small, normal, large, title |  |
 | `align` | `"left"` | left, center, right |  |
@@ -1689,6 +1799,13 @@ the output of a command or script
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1707,6 +1824,8 @@ the output of a command or script
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** Highlights, meters, graphs. |
 | `dim_color` | `"dim"` | colour name or hex | **Dim colour.** Labels and less important text. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `hover_text` | `""` |  | **Hover text.** Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\n = new line). Empty = nothing extra. |
+| `reveal_time` | `220` | 0 to 3000 | **Reveal time.** Milliseconds the panel takes to grow (and shrink back). |
 | `command` | `"powershell -NoProfile -Command \"Get-Process \| Sort-Object CPU -Descending \| Select-Object -First 5 -ExpandProperty Name\""` |  | A program and its arguments; its printed output is shown. E.g. powershell -NoProfile -Command "Get-Date". |
 | `interval` | `30` | 1 to 86400 | Run it again every this many seconds. |
 | `max_lines` | `12` | 1 to 200 | **Max lines.**  |
@@ -1734,6 +1853,13 @@ ASCII logo with system info (neofetch style)
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1752,6 +1878,8 @@ ASCII logo with system info (neofetch style)
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** Highlights, meters, graphs. |
 | `dim_color` | `"dim"` | colour name or hex | **Dim colour.** Labels and less important text. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `hover_text` | `""` |  | **Hover text.** Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\n = new line). Empty = nothing extra. |
+| `reveal_time` | `220` | 0 to 3000 | **Reveal time.** Milliseconds the panel takes to grow (and shrink back). |
 | `art` | `""` |  | ASCII art file (in the theme folder or config\art). Empty = a built-in Windows logo. |
 | `art_color` | `"accent"` | colour name or hex | **Art colour.**  |
 | `lines` | `["[accent]{user}[/]@[accent]{host}[/]", "[dim]───────────────[/]", "[accent]os[/]      {os}", "[accent]cpu[/]     {cpu_name}", "[accent]gpu[/]     {gpu_name}", "[accent]memory[/]  {ram_used} / {ram_total}", "[accent]uptime[/]  {uptime}"]` |  | The lines beside the art. Use {values} and [colour]…[/] markup. |
@@ -1778,6 +1906,13 @@ a picture
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1796,6 +1931,8 @@ a picture
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** Highlights, meters, graphs. |
 | `dim_color` | `"dim"` | colour name or hex | **Dim colour.** Labels and less important text. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `hover_text` | `""` |  | **Hover text.** Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\n = new line). Empty = nothing extra. |
+| `reveal_time` | `220` | 0 to 3000 | **Reveal time.** Milliseconds the panel takes to grow (and shrink back). |
 | `file` | `""` |  | A picture (PNG/JPG), looked for in the theme folder and config\images. |
 | `rows` | `10` | 1 to 100 | Height, in lines of text. |
 | `style` | `"auto"` | auto, original, tint, mono, ascii | auto = characters in terminal themes, the picture in smooth ones. |
@@ -1823,6 +1960,13 @@ plays a video or an ASCII clip (as characters or the real picture)
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1874,6 +2018,13 @@ sound controls: output device, master and per-app volume
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1892,6 +2043,8 @@ sound controls: output device, master and per-app volume
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** Highlights, meters, graphs. |
 | `dim_color` | `"dim"` | colour name or hex | **Dim colour.** Labels and less important text. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `hover_text` | `""` |  | **Hover text.** Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\n = new line). Empty = nothing extra. |
+| `reveal_time` | `220` | 0 to 3000 | **Reveal time.** Milliseconds the panel takes to grow (and shrink back). |
 | `devices` | `"current"` | current, list, none | **Output device.** current = the device in use (click it to switch to the next one, scroll to go back and forth). list = every output, click one to use it. none = hide. |
 | `master` | `true` | true, false | **Master volume.** A slider for the whole volume: click to set, scroll to change, click its name to mute. |
 | `apps` | `true` | true, false | **App volumes.** A slider for every app making sound (like the Windows volume mixer). |
@@ -1924,6 +2077,13 @@ lines that keep coming in: made-up hex, logs or values (a live-looking readout)
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1942,6 +2102,8 @@ lines that keep coming in: made-up hex, logs or values (a live-looking readout)
 | `accent_color` | `"accent"` | colour name or hex | **Accent colour.** Highlights, meters, graphs. |
 | `dim_color` | `"dim"` | colour name or hex | **Dim colour.** Labels and less important text. |
 | `on_click` | `""` |  | **On click.** What happens on click: launcher, tile:toggle, tile:layout:next, theme:soft, media:toggle, media:next, media:prev, volume:mute, volume:up, volume:down, volume:+10, volume:40, audio:device:next (switch speakers/headphones), audio:app:Spotify:mute, audio:mixer, desktop:next, desktop:prev, desktop:2, keys:win+n, run:program args, settings, or a file / folder / program / website to open. |
+| `hover_text` | `""` |  | **Hover text.** Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\n = new line). Empty = nothing extra. |
+| `reveal_time` | `220` | 0 to 3000 | **Reveal time.** Milliseconds the panel takes to grow (and shrink back). |
 | `lines` | `["0x{seq:X4}  {pick:SYN,ACK,PKT,AUTH,ROUTE}  {hex:2}:{hex:2}  {pick:OK,OK,OK,LOCKED,PASS}  {hex:4}-{hex:4}"]` |  | Patterns for new lines (one is picked at random each time). Besides {values}: {hex:4} = random hex digits, {num:10-99} = a random number, {pick:a,b,c} = one of these, {seq:X4} = a counting number (X4 = 4 hex digits), {spaces:0-6} = random spaces. [colour]…[/] works too. |
 | `interval` | `1.5` | 0.05 to 3600 | Seconds between new lines. |
 | `jitter` | `0.5` | 0 to 1 | **Random wait.** Make the wait between lines vary by up to this fraction (0.5 = ±50%). |
@@ -1974,6 +2136,13 @@ a menu screen: your shortcut groups as tabs, the chosen group's shortcuts as a l
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -1981,6 +2150,8 @@ a menu screen: your shortcut groups as tabs, the chosen group's shortcuts as a l
 | `link_gap` | `5` | 1 to 50 | **Link gap.** Pixels between the lines. |
 | `link_shape` | `"elbow"` | elbow, straight | **Link shape.** elbow = a 45° bend then straight, straight = one straight line. |
 | `link_ends` | `"dot"` | none, dot, both | **Link ends.** A small square where the line meets the panels. |
+| `width` | `900` | 100 to 8000 | Width in pixels when it isn't stretched (Stretch). |
+| `height` | `600` | 100 to 8000 | Height in pixels when it isn't stretched. |
 | `tabs` | `[]` |  | **Tabs.** The shortcut groups shown as tabs, in order (names as in the shortcuts' Group). Empty = every group: the Shortcuts page's groups first, then any other group a shortcut names. |
 | `ungrouped_tab` | `"Other"` |  | **Ungrouped tab.** A tab for the shortcuts that have no group, with this name. Empty = leave them out. |
 | `launch` | `"double_click"` | double_click, click | **Open with.** double_click = a click selects (and shows the details), a double click opens. click = a click opens. |
@@ -1988,7 +2159,11 @@ a menu screen: your shortcut groups as tabs, the chosen group's shortcuts as a l
 | `wipe_style` | `"cubic"` | linear, sine, quad, cubic, quart, quint, exponential, circular, back, elastic, bounce | **Wipe easing.** The shape of the hover wipe's motion (as in animations): cubic = quick then settling, linear = steady, back = overshoots, bounce, elastic… |
 | `wipe_direction` | `"out"` | in, out, inout | **Wipe direction.** out = fast start, gentle end. in = gentle start, fast end. inout = gentle at both ends. |
 | `upper` | `true` | true, false | **Capitals.** Tabs and the heading in capitals. |
-| `tab_layout` | `"spread"` | spread, packed | **Tab layout.** spread = the tabs fill the width with even gaps. packed = side by side from the left. |
+| `tab_layout` | `"spread"` | spread, packed, column | **Tab layout.** spread = the tabs fill the width with even gaps. packed = side by side from the left. column = a column down the left side (good with Tab style = icons). |
+| `tab_style` | `"full"` | full, icons, text | **Tab style.** full = icon and name. icons = just the group's icon (a square button). text = just the name. |
+| `tab_active_frame` | `"none"` |  | **Active tab frame.** A frame that fades in over the chosen tab and the one under the mouse (e.g. a bright outline). none = the tab frame's Hover fill only. |
+| `tab_icon_color` | `"auto"` | colour name or hex | **Icon colour.** Colour of the tab icons when there's no icon box. auto = the tab text colour. |
+| `tab_active_icon` | `"auto"` | colour name or hex | **Active icon colour.** Icon colour on the chosen tab. auto = the active text colour. |
 | `tab_height` | `28` | 12 to 200 | **Tab height.**  |
 | `tab_gap` | `18` | 0 to 400 | **Tab gap.** Pixels between tabs (packed), or the least gap (spread). |
 | `tab_inset` | `40` | 0 to 1000 | **Tab inset.** Space at the left and right ends of the tab row, in pixels. |
@@ -2005,6 +2180,9 @@ a menu screen: your shortcut groups as tabs, the chosen group's shortcuts as a l
 | `rule_color` | `"text"` | colour name or hex | **Rule colour.**  |
 | `rule_gap` | `14` | 0 to 200 | **Rule gap.** Pixels between the tabs and the rule. |
 | `heading` | `true` | true, false | **Show heading.** The chosen tab's name in big letters, with the group's Subtitle and Description under it. |
+| `heading_text` | `""` |  | **Heading text.** What the big heading says, with {values}: e.g. {greeting}, {user}. Empty = the chosen tab's name. |
+| `heading_sub` | `""` |  | **Heading line.** The small line under the heading, with {values}. Empty = the group's Subtitle. |
+| `heading_bold` | `false` | true, false | **Heading bold.**  |
 | `heading_gap` | `36` | 0 to 400 | **Heading gap.** Pixels between the rule and the heading. |
 | `heading_scale` | `2.3` | 1 to 8 | **Heading size.** Size of the big name compared with normal text. |
 | `heading_spacing` | `4` | -5 to 60 | **Heading spacing.**  |
@@ -2013,7 +2191,12 @@ a menu screen: your shortcut groups as tabs, the chosen group's shortcuts as a l
 | `subtitle_color` | `"dim"` | colour name or hex | **Subtitle colour.**  |
 | `subtitle_spacing` | `3` | -5 to 50 | **Subtitle spacing.**  |
 | `inset` | `40` | 0 to 1000 | **Heading inset.** Space from the left edge to the heading and the list. |
-| `list_width` | `240` | 60 to 2000 | **List width.**  |
+| `list_layout` | `"list"` | list, cards | **List layout.** list = one row per shortcut. cards = a grid of cards with the shortcut's icon, name and description. |
+| `card_columns` | `3` | 1 to 12 | **Card columns.** cards: how many side by side. |
+| `card_height` | `100` | 30 to 600 | **Card height.**  |
+| `icons` | `false` | true, false | **App icons.** Show each shortcut's own icon (instead of the bullet square). |
+| `item_active_frame` | `"none"` |  | **Active item frame.** A frame that fades in over the chosen item and the one under the mouse. none = the item frame's Hover fill only. |
+| `list_width` | `240` | 0 to 3000 | **List width.** list: width of the rows. cards: width of the grid (0 = all the room there is). |
 | `item_height` | `32` | 12 to 200 | **Item height.**  |
 | `item_gap` | `12` | 0 to 100 | **Item gap.** Pixels between items. |
 | `list_gap` | `36` | 0 to 400 | **List gap.** Pixels between the heading and the list. |
@@ -2049,6 +2232,13 @@ a line across or down the screen: solid, dashed, dotted, double or a printed-for
 | `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
 | `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
 | `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
 | `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
 | `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
 | `link_width` | `1` | 0.5 to 20 | **Link width.**  |
@@ -2066,6 +2256,107 @@ a line across or down the screen: solid, dashed, dotted, double or a printed-for
 | `dash_gap` | `4` | 1 to 400 | **Dash gap.** Pixels between dashes or dots. |
 | `band_spacing` | `36` | 4 to 400 | **Band spacing.** band: pixels between the dot triangles. |
 | `band_color` | `"auto"` | colour name or hex | **Band colour.** band: colour of the dashes and dots. auto = the line colour. |
+
+### widgets.toml [[widget]] type = "themes"
+
+cards for your themes (wallpaper picture, colours, name); click one to switch to it
+
+| Option | Default | Allowed | What it does |
+|---|---|---|---|
+| `enabled` | `true` | true, false | Show this panel. |
+| `name` | `""` |  | A name for this panel, so another panel can draw a line to it (Link to). |
+| `anchor` | `"right"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
+| `offset_x` | `40` |  | **Offset X.** Move it right (or left if negative), in pixels. |
+| `offset_y` | `0` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
+| `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
+| `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
+| `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
+| `corner_radius` | `-1` | -1 to 200 | **Corner radius.** Smooth style, in pixels. -1 = the theme's. |
+| `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
+| `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
+| `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
+| `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
+| `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
+| `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
+| `link_width` | `1` | 0.5 to 20 | **Link width.**  |
+| `link_lines` | `1` | 1 to 5 | **Link lines.** How many lines side by side. |
+| `link_gap` | `5` | 1 to 50 | **Link gap.** Pixels between the lines. |
+| `link_shape` | `"elbow"` | elbow, straight | **Link shape.** elbow = a 45° bend then straight, straight = one straight line. |
+| `link_ends` | `"dot"` | none, dot, both | **Link ends.** A small square where the line meets the panels. |
+| `title` | `"THEMES"` |  | Title over the cards. Empty = none. |
+| `show` | `[]` |  | Which themes, in order (folder names). Empty = all of them. |
+| `width` | `260` | 80 to 3000 | Width of the panel, in pixels. |
+| `columns` | `1` | 1 to 10 | Cards side by side. |
+| `card_height` | `72` | 24 to 600 | **Card height.**  |
+| `card_gap` | `10` | 0 to 100 | **Card gap.**  |
+| `dots` | `["accent", "accent_bright", "bright"]` |  | **Colour dots.** Which of each theme's colours to show as little squares on its card. |
+| `dim` | `0.35` | 0 to 1 | **Picture dim.** Darken each card's picture (the theme's wallpaper) so the name stays readable: 0 = not at all, 1 = black. |
+| `card_frame` | `"none"` |  | **Card frame.** A frame for the cards (Frames page). none = plain rounded cards. |
+| `current_frame` | `"none"` |  | **Current frame.** A frame over the card of the theme in use (and the one under the mouse). none = an outline in the accent colour. |
+| `name_color` | `"bright"` | colour name or hex | **Name colour.**  |
+| `current_color` | `"accent"` | colour name or hex | **Current colour.** The outline and tick on the theme in use (when Current frame is none). |
+| `radius` | `10` | 0 to 60 | **Corner radius.**  |
+
+### widgets.toml [[widget]] type = "toggles"
+
+quick buttons (Wi-Fi, Bluetooth, mute, snip, lock…) that light up when on and rise under the mouse
+
+| Option | Default | Allowed | What it does |
+|---|---|---|---|
+| `enabled` | `true` | true, false | Show this panel. |
+| `name` | `""` |  | A name for this panel, so another panel can draw a line to it (Link to). |
+| `anchor` | `"bottom_left"` | top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right | Which corner or edge of the screen it sits against. |
+| `offset_x` | `40` |  | **Offset X.** Move it right (or left if negative), in pixels. |
+| `offset_y` | `40` |  | **Offset Y.** Move it down (or up if negative), in pixels. |
+| `stretch` | `"none"` | none, width, height, both | Stretch it to the edges of the screen (less the bar): width = from Offset X on the left to Offset X on the right, height = from Offset Y at the top to Offset Y at the bottom. none = its own size. |
+| `frame` | `"auto"` |  | A frame from the Frames page: cut corners, title strips, brackets, patterns… auto = the theme's panel frame (Colours & look), none = a plain box with the settings below. Smooth style. |
+| `background` | `"auto"` | colour name or hex | **Box colour.** Colour of this panel. auto = the theme's panel colour. |
+| `opacity` | `-1` | -1 to 1 | **Box opacity.** 0 = see-through, 1 = solid, -1 = the theme's. |
+| `corner_radius` | `-1` | -1 to 200 | **Corner radius.** Smooth style, in pixels. -1 = the theme's. |
+| `border_color` | `"auto"` | colour name or hex | **Border colour.** auto = the theme's. |
+| `border_width` | `-1` | -1 to 50 | **Border width.** Smooth style, in pixels. -1 = the theme's. Terminal style: 0 hides the box lines. |
+| `panel_shadow` | `-1` | -1 to 1 | **Box shadow.** Smooth style. -1 = the theme's. |
+| `font` | `""` |  | Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\fonts are listed too. |
+| `font_size` | `0` | 0 to 96 | **Font size.** Text size for this box, in pixels. 0 = the theme's. |
+| `box_hover_color` | `"none"` | colour name or hex | **Hover colour.** If the box does something on click, it lights up in this colour under the mouse. none = no highlight. |
+| `tilt_x` | `0` | -80 to 80 | **Tilt X.** Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above. |
+| `tilt_y` | `0` | -80 to 80 | **Tilt Y.** Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back. |
+| `depth` | `1600` | 100 to 20000 | **Depth.** How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance. |
+| `tilt_follow` | `0` | 0 to 45 | **Tilt to mouse.** Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off. |
+| `tilt_around` | `""` |  | **Tilt around.** Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle. |
+| `rotate` | `0` | -360 to 360 | Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text). |
+| `alpha` | `1` | 0 to 1 | **Opacity.** See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark. |
+| `link_to` | `""` |  | **Link to.** Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style. |
+| `link_color` | `"accent_dim"` | colour name or hex | **Link colour.**  |
+| `link_width` | `1` | 0.5 to 20 | **Link width.**  |
+| `link_lines` | `1` | 1 to 5 | **Link lines.** How many lines side by side. |
+| `link_gap` | `5` | 1 to 50 | **Link gap.** Pixels between the lines. |
+| `link_shape` | `"elbow"` | elbow, straight | **Link shape.** elbow = a 45° bend then straight, straight = one straight line. |
+| `link_ends` | `"dot"` | none, dot, both | **Link ends.** A small square where the line meets the panels. |
+| `title` | `""` |  | Title over the buttons. Empty = none. |
+| `buttons` | `["{icon:wifi} \| Wi-Fi \| ms-settings:network-wifi \| {wifi}", "{icon:bluetooth} \| Bluetooth \| ms-settings:bluetooth \| {bluetooth}", "{icon:volume_off} \| Mute \| volume:mute \| {muted}", "{icon:notifications} \| Alerts \| keys:win+n \| ", "{icon:screenshot_region} \| Snip \| keys:win+shift+s \| ", "{icon:lock} \| Lock \| keys:win+l \| "]` |  | One button per line: icon \| label \| what clicking does \| when it's on. The icon is {icon:name} (Icons page) or any text; the action is any click action (ms-settings:…, volume:mute, keys:win+l, a program…); 'when it's on' is a {value} — the button lights up when it isn't empty, off or 0 (e.g. {muted}, {bluetooth}, {wifi}). Leave the last part empty for a plain button. |
+| `columns` | `6` | 1 to 20 | Buttons side by side (then a new row). |
+| `button_size` | `72` | 24 to 400 | **Button size.** Width and height of each button, in pixels. |
+| `gap` | `10` | 0 to 100 | Pixels between buttons. |
+| `labels` | `true` | true, false | **Show labels.** The label under each icon. |
+| `icon_scale` | `1.9` | 0.5 to 6 | **Icon size.** Size of the icons compared with normal text. |
+| `button_frame` | `"none"` |  | **Button frame.** A frame for the buttons (Frames page). none = plain rounded buttons. |
+| `on_frame` | `"none"` |  | **On frame.** A frame that fades in on buttons that are on (and the one under the mouse, half way). none = the On colour as a glow. |
+| `icon_color` | `"text"` | colour name or hex | **Icon colour.**  |
+| `on_color` | `"accent"` | colour name or hex | **On colour.** Icon colour of buttons that are on. |
+| `label_color` | `"dim"` | colour name or hex | **Label colour.**  |
+| `lift` | `3` | 0 to 40 | **Hover lift.** Pixels a button rises under the mouse. |
+| `hover_ms` | `140` | 0 to 2000 | **Hover time.** Milliseconds the hover rise and glow take. |
 
 ### shortcuts.toml [[shortcut]]
 

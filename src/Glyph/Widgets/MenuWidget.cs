@@ -11,6 +11,8 @@ internal sealed class MenuOptions : WidgetOptions
     public override string Type => "menu";
     public MenuOptions() { Anchor = "top_left"; OffsetX = 20; OffsetY = 140; Stretch = "both"; }
 
+    [Category("Placement"), Description("Width in pixels when it isn't stretched (Stretch)."), Range(100, 8000)] public float Width { get; set; } = 900;
+    [Category("Placement"), Description("Height in pixels when it isn't stretched."), Range(100, 8000)] public float Height { get; set; } = 600;
     [Category("Menu"), DisplayName("Tabs"), Description("The shortcut groups shown as tabs, in order (names as in the shortcuts' Group). Empty = every group: the Shortcuts page's groups first, then any other group a shortcut names."), TypeConverter(typeof(ListConverter))]
     public string[] Tabs { get; set; } = Array.Empty<string>();
     [Category("Menu"), DisplayName("Ungrouped tab"), Description("A tab for the shortcuts that have no group, with this name. Empty = leave them out.")] public string UngroupedTab { get; set; } = "Other";
@@ -24,7 +26,11 @@ internal sealed class MenuOptions : WidgetOptions
     public string WipeDirection { get; set; } = "out";
     [Category("Menu"), DisplayName("Capitals"), Description("Tabs and the heading in capitals.")] public bool Upper { get; set; } = true;
 
-    [Category("Tabs"), DisplayName("Tab layout"), Description("spread = the tabs fill the width with even gaps. packed = side by side from the left."), Choices("spread", "packed"), TypeConverter(typeof(ChoicesConverter))] public string TabLayout { get; set; } = "spread";
+    [Category("Tabs"), DisplayName("Tab layout"), Description("spread = the tabs fill the width with even gaps. packed = side by side from the left. column = a column down the left side (good with Tab style = icons)."), Choices("spread", "packed", "column"), TypeConverter(typeof(ChoicesConverter))] public string TabLayout { get; set; } = "spread";
+    [Category("Tabs"), DisplayName("Tab style"), Description("full = icon and name. icons = just the group's icon (a square button). text = just the name."), Choices("full", "icons", "text"), TypeConverter(typeof(ChoicesConverter))] public string TabStyle { get; set; } = "full";
+    [Category("Tabs"), DisplayName("Active tab frame"), Description("A frame that fades in over the chosen tab and the one under the mouse (e.g. a bright outline). none = the tab frame's Hover fill only."), TypeConverter(typeof(FrameNameConverter))] public string TabActiveFrame { get; set; } = "none";
+    [Category("Tabs"), DisplayName("Icon colour"), Description("Colour of the tab icons when there's no icon box. auto = the tab text colour."), Color, TypeConverter(typeof(ColorNameConverter))] public string TabIconColor { get; set; } = "auto";
+    [Category("Tabs"), DisplayName("Active icon colour"), Description("Icon colour on the chosen tab. auto = the active text colour."), Color, TypeConverter(typeof(ColorNameConverter))] public string TabActiveIcon { get; set; } = "auto";
     [Category("Tabs"), DisplayName("Tab height"), Range(12, 200)] public float TabHeight { get; set; } = 28;
     [Category("Tabs"), DisplayName("Tab gap"), Description("Pixels between tabs (packed), or the least gap (spread)."), Range(0, 400)] public float TabGap { get; set; } = 18;
     [Category("Tabs"), DisplayName("Tab inset"), Description("Space at the left and right ends of the tab row, in pixels."), Range(0, 1000)] public float TabInset { get; set; } = 40;
@@ -42,6 +48,9 @@ internal sealed class MenuOptions : WidgetOptions
     [Category("Tabs"), DisplayName("Rule gap"), Description("Pixels between the tabs and the rule."), Range(0, 200)] public float RuleGap { get; set; } = 14;
 
     [Category("Heading"), DisplayName("Show heading"), Description("The chosen tab's name in big letters, with the group's Subtitle and Description under it.")] public bool Heading { get; set; } = true;
+    [Category("Heading"), DisplayName("Heading text"), Description("What the big heading says, with {values}: e.g. {greeting}, {user}. Empty = the chosen tab's name.")] public string HeadingText { get; set; } = "";
+    [Category("Heading"), DisplayName("Heading line"), Description("The small line under the heading, with {values}. Empty = the group's Subtitle.")] public string HeadingSub { get; set; } = "";
+    [Category("Heading"), DisplayName("Heading bold")] public bool HeadingBold { get; set; }
     [Category("Heading"), DisplayName("Heading gap"), Description("Pixels between the rule and the heading."), Range(0, 400)] public float HeadingGap { get; set; } = 36;
     [Category("Heading"), DisplayName("Heading size"), Description("Size of the big name compared with normal text."), Range(1, 8)] public float HeadingScale { get; set; } = 2.3f;
     [Category("Heading"), DisplayName("Heading spacing"), Range(-5, 60)] public float HeadingSpacing { get; set; } = 4;
@@ -51,7 +60,12 @@ internal sealed class MenuOptions : WidgetOptions
     [Category("Heading"), DisplayName("Subtitle spacing"), Range(-5, 50)] public float SubtitleSpacing { get; set; } = 3;
     [Category("Heading"), DisplayName("Heading inset"), Description("Space from the left edge to the heading and the list."), Range(0, 1000)] public float Inset { get; set; } = 40;
 
-    [Category("List"), DisplayName("List width"), Range(60, 2000)] public float ListWidth { get; set; } = 240;
+    [Category("List"), DisplayName("List layout"), Description("list = one row per shortcut. cards = a grid of cards with the shortcut's icon, name and description."), Choices("list", "cards"), TypeConverter(typeof(ChoicesConverter))] public string ListLayout { get; set; } = "list";
+    [Category("List"), DisplayName("Card columns"), Description("cards: how many side by side."), Range(1, 12)] public int CardColumns { get; set; } = 3;
+    [Category("List"), DisplayName("Card height"), Range(30, 600)] public float CardHeight { get; set; } = 100;
+    [Category("List"), DisplayName("App icons"), Description("Show each shortcut's own icon (instead of the bullet square).")] public bool Icons { get; set; }
+    [Category("List"), DisplayName("Active item frame"), Description("A frame that fades in over the chosen item and the one under the mouse. none = the item frame's Hover fill only."), TypeConverter(typeof(FrameNameConverter))] public string ItemActiveFrame { get; set; } = "none";
+    [Category("List"), DisplayName("List width"), Description("list: width of the rows. cards: width of the grid (0 = all the room there is)."), Range(0, 3000)] public float ListWidth { get; set; } = 240;
     [Category("List"), DisplayName("Item height"), Range(12, 200)] public float ItemHeight { get; set; } = 32;
     [Category("List"), DisplayName("Item gap"), Description("Pixels between items."), Range(0, 100)] public float ItemGap { get; set; } = 12;
     [Category("List"), DisplayName("List gap"), Description("Pixels between the heading and the list."), Range(0, 400)] public float ListGap { get; set; } = 36;
@@ -77,6 +91,10 @@ internal sealed class MenuWidget : Widget
     readonly Theme t;
     readonly List<(string name, string label, string icon, string sub, string desc, List<Shortcut> items)> tabs = new();
     readonly FrameOptions tabFrame, itemFrame, detailsFrame;
+    readonly FrameOptions? tabActive, itemActive;
+    bool Column => o.TabLayout == "column";
+    bool Cards => o.ListLayout == "cards";
+    float colRight;   // column layout: right edge of the tab column
     readonly string key;
     static readonly Dictionary<string, (int tab, int item)> remembered = new();
     int tab, item = -1, scroll;
@@ -86,6 +104,7 @@ internal sealed class MenuWidget : Widget
     readonly List<RectangleF> itemRects = new();
     readonly List<(RectangleF r, string label, Action<WidgetEnv> run)> buttons = new();
     RectangleF listArea, detailsRect, headRect;
+    float headX;
     float ruleY, headY, fontSize;
     string font = "";
     int visibleItems;
@@ -118,6 +137,8 @@ internal sealed class MenuWidget : Widget
         if (remembered.TryGetValue(key, out var r)) { tab = Math.Clamp(r.tab, 0, Math.Max(0, tabs.Count - 1)); item = r.item; }
         if (tab < tabs.Count && (item < 0 || item >= tabs[tab].items.Count)) item = tabs[tab].items.Count > 0 ? 0 : -1;
 
+        tabActive = t.Frame(o.TabActiveFrame);
+        itemActive = t.Frame(o.ItemActiveFrame);
         tabFrame = t.Frame(o.TabFrame) ?? Plate();
         itemFrame = t.Frame(o.ItemFrame) ?? Plate();
         detailsFrame = t.Frame(o.DetailsFrame) ?? new FrameOptions
@@ -143,7 +164,7 @@ internal sealed class MenuWidget : Widget
     public override void Layout(WidgetEnv e)
     {
         font = e.Painter.Font; fontSize = e.BaseFontSize;
-        float w = WantW(o, 900, e), h = WantH(o, 600, e);
+        float w = WantW(o, o.Width, e), h = WantH(o, o.Height, e);
         var pt = PlaceFor(o, w, h, e.Area);
         Bounds = new RectangleF(pt.X, pt.Y, w, h);
         float x0 = Bounds.X, y0 = Bounds.Y;
@@ -153,16 +174,37 @@ internal sealed class MenuWidget : Widget
         var widths = new List<float>();
         foreach (var tb in tabs)
         {
-            float tw = o.TabPadding * 2 + Measure(e, TabText(tb), fontSize, o.TabSpacing);
-            if (tb.icon.Length > 0) tw += (o.IconBox > 0 ? o.IconBox : fontSize * 1.2f) + 8;
+            float tw;
+            if (o.TabStyle == "icons") tw = o.TabHeight;
+            else
+            {
+                tw = o.TabPadding * 2 + Measure(e, TabText(tb), fontSize, o.TabSpacing);
+                if (tb.icon.Length > 0 && o.TabStyle == "full") tw += (o.IconBox > 0 ? o.IconBox : fontSize * 1.2f) + 8;
+            }
             widths.Add(tw);
         }
-        float rowW = Bounds.Width - 2 * o.TabInset, sum = widths.Sum();
-        float gap = o.TabLayout == "spread" && tabs.Count > 1 ? Math.Max(o.TabGap, (rowW - sum) / (tabs.Count - 1)) : o.TabGap;
-        float x = x0 + o.TabInset;
-        foreach (var tw in widths) { tabRects.Add(new RectangleF(x, y0, tw, o.TabHeight)); x += tw + gap; }
-        ruleY = y0 + o.TabHeight + o.RuleGap;
-        float below = ruleY + (o.Rule == "band" ? 23 : o.Rule == "solid" ? 2 : 0);
+        float below;
+        if (Column)
+        {
+            // a column down the left: tabs stacked, the rest of the menu to the right of it
+            float cw = widths.Count > 0 ? widths.Max() : o.TabHeight;
+            float ty = y0 + o.TabInset * 0.5f;
+            foreach (var _ in widths) { tabRects.Add(new RectangleF(x0 + o.TabPadding, ty, cw, o.TabHeight)); ty += o.TabHeight + Math.Min(o.TabGap, 40); }
+            colRight = x0 + o.TabPadding * 2 + cw;
+            ruleY = -1;
+            below = y0;
+            x0 = colRight + o.RuleGap;
+        }
+        else
+        {
+            float rowW = Bounds.Width - 2 * o.TabInset, sum = widths.Sum();
+            float gap = o.TabLayout == "spread" && tabs.Count > 1 ? Math.Max(o.TabGap, (rowW - sum) / (tabs.Count - 1)) : o.TabGap;
+            float x = x0 + o.TabInset;
+            foreach (var tw in widths) { tabRects.Add(new RectangleF(x, y0, tw, o.TabHeight)); x += tw + gap; }
+            ruleY = y0 + o.TabHeight + o.RuleGap;
+            below = ruleY + (o.Rule == "band" ? 23 : o.Rule == "solid" ? 2 : 0);
+            colRight = -1;
+        }
 
         // heading
         headY = below + o.HeadingGap;
@@ -170,24 +212,48 @@ internal sealed class MenuWidget : Widget
         if (o.Heading && tab < tabs.Count)
         {
             y += fontSize * o.HeadingScale * 1.36f + 8;
-            if (tabs[tab].sub.Length > 0) y += fontSize * 1.5f;
+            if (HeadSub().Length > 0) y += fontSize * 1.5f;
             if (tabs[tab].desc.Length > 0) y += fontSize * 1.4f;
         }
         else headY = -1;
-        headRect = headY < 0 ? RectangleF.Empty : new RectangleF(x0 + o.Inset, headY, Math.Min(700, Bounds.Width - o.Inset), y - headY);
+        headRect = headY < 0 ? RectangleF.Empty : new RectangleF(x0 + o.Inset, headY, Math.Min(700, Bounds.Right - x0 - o.Inset), y - headY);
+        headX = x0 + o.Inset;
 
         // list
         itemRects.Clear();
         float ly = (headY < 0 ? below : y) + o.ListGap, lx = x0 + o.Inset + (o.RailColor != "none" ? o.RailWidth + 18 : 0);
-        listArea = new RectangleF(lx, ly, o.ListWidth, Math.Max(o.ItemHeight, Bounds.Bottom - ly - 10));
         int count = tab < tabs.Count ? tabs[tab].items.Count : 0;
-        float step = o.ItemHeight + o.ItemGap;
-        visibleItems = Math.Max(1, (int)((listArea.Height + o.ItemGap) / step));
-        scroll = Math.Clamp(scroll, 0, Math.Max(0, count - visibleItems));
-        for (int i = 0; i < count; i++)
+        if (Cards)
         {
-            int k = i - scroll;
-            itemRects.Add(k < 0 || k >= visibleItems ? RectangleF.Empty : new RectangleF(lx, ly + k * step, o.ListWidth, o.ItemHeight));
+            if (o.RailColor != "none") lx -= o.RailWidth + 18;   // no rail beside cards
+            float room = Bounds.Right - lx - 16 - (o.Details ? o.DetailsWidth + 24 : 0);
+            float gw = o.ListWidth > 0 ? Math.Min(o.ListWidth, room) : room;
+            int cols = Math.Max(1, o.CardColumns);
+            float cw = Math.Max(40, (gw - (cols - 1) * o.ItemGap) / cols);
+            listArea = new RectangleF(lx, ly, cols * cw + (cols - 1) * o.ItemGap, Math.Max(o.CardHeight, Bounds.Bottom - ly - 10));
+            int rowsShown = Math.Max(1, (int)((listArea.Height + o.ItemGap) / (o.CardHeight + o.ItemGap)));
+            visibleItems = rowsShown * cols;
+            int rowsAll = (count + cols - 1) / cols;
+            scroll = Math.Clamp(scroll, 0, Math.Max(0, rowsAll - rowsShown) * cols);
+            scroll -= scroll % cols;
+            for (int i = 0; i < count; i++)
+            {
+                int k = i - scroll;
+                itemRects.Add(k < 0 || k >= visibleItems ? RectangleF.Empty
+                    : new RectangleF(lx + (k % cols) * (cw + o.ItemGap), ly + (k / cols) * (o.CardHeight + o.ItemGap), cw, o.CardHeight));
+            }
+        }
+        else
+        {
+            listArea = new RectangleF(lx, ly, o.ListWidth, Math.Max(o.ItemHeight, Bounds.Bottom - ly - 10));
+            float step = o.ItemHeight + o.ItemGap;
+            visibleItems = Math.Max(1, (int)((listArea.Height + o.ItemGap) / step));
+            scroll = Math.Clamp(scroll, 0, Math.Max(0, count - visibleItems));
+            for (int i = 0; i < count; i++)
+            {
+                int k = i - scroll;
+                itemRects.Add(k < 0 || k >= visibleItems ? RectangleF.Empty : new RectangleF(lx, ly + k * step, o.ListWidth, o.ItemHeight));
+            }
         }
 
         // details
@@ -196,7 +262,7 @@ internal sealed class MenuWidget : Widget
         if (o.Details && tab < tabs.Count && item >= 0 && item < tabs[tab].items.Count)
         {
             var s = tabs[tab].items[item];
-            float dx = lx + o.ListWidth + 24 + (count > visibleItems ? 10 : 0);
+            float dx = listArea.Right + 24 + (count > visibleItems ? 10 : 0);
             float rowH = fontSize * 2.1f;
             var ins = FramePainter.Space(detailsFrame, t, fontSize, true);
             int rows = Rows(s).Count;
@@ -212,6 +278,9 @@ internal sealed class MenuWidget : Widget
                     env => env.Do?.Invoke(File.Exists(folder) ? $"run:explorer.exe /select,\"{folder}\"" : folder)));
         }
     }
+
+    string HeadText() => tab >= tabs.Count ? "" : o.HeadingText.Length > 0 ? Glyph.Data.Fmt.Text(o.HeadingText, Glyph.Data.Stats.Value) : Up(tabs[tab].label);
+    string HeadSub() => tab >= tabs.Count ? "" : o.HeadingSub.Length > 0 ? Glyph.Data.Fmt.Text(o.HeadingSub, Glyph.Data.Stats.Value) : tabs[tab].sub.ToUpperInvariant();
 
     string TabText((string name, string label, string icon, string sub, string desc, List<Shortcut> items) tb) =>
         Up(tb.label) + (o.TabCounts ? $" ({tb.items.Count})" : "");
@@ -251,10 +320,12 @@ internal sealed class MenuWidget : Widget
     {
         yield return new Part("Menu", Bounds, null);
         foreach (var r in tabRects) yield return new Part("Tab", r, new[] { "Tabs", "Menu" }, "TabFrame");
-        if (o.Rule != "none" && tabRects.Count > 0) yield return new Part("Rule under the tabs", new RectangleF(Bounds.X, ruleY - 3, Bounds.Width, 26), new[] { "Tabs" });
+        if (o.Rule != "none" && tabRects.Count > 0)
+            yield return Column ? new Part("Rule beside the tabs", new RectangleF(colRight - 3, Bounds.Y, 8, Bounds.Height), new[] { "Tabs" })
+                                : new Part("Rule under the tabs", new RectangleF(Bounds.X, ruleY - 3, Bounds.Width, 26), new[] { "Tabs" });
         if (!headRect.IsEmpty) yield return new Part("Heading", headRect, new[] { "Heading" });
         if (o.RailColor != "none") yield return new Part("Rail", new RectangleF(listArea.X - 18 - o.RailWidth - 4, listArea.Y, o.RailWidth + 8, Math.Min(listArea.Height, itemRects.Count * (o.ItemHeight + o.ItemGap))), new[] { "List" });
-        foreach (var r in itemRects) if (!r.IsEmpty) yield return new Part("List item", r, new[] { "List", "Menu" }, "ItemFrame");
+        foreach (var r in itemRects) if (!r.IsEmpty) yield return new Part(Cards ? "Card" : "List item", r, new[] { "List", "Menu" }, "ItemFrame");
         if (!detailsRect.IsEmpty) yield return new Part("Details", detailsRect, new[] { "Details" }, "DetailsFrame");
         foreach (var b in buttons) yield return new Part("Details button", b.r, new[] { "Details", "List" }, "ItemFrame");
     }
@@ -271,7 +342,10 @@ internal sealed class MenuWidget : Widget
 
     /// The parts that are really there (so dragging a selection box still works on the empty screen around them).
     public override bool Covers(float x, float y) =>
-        HitTest(x, y) >= 0 || detailsRect.Contains(x, y) || listArea.Contains(x, y) || (y >= Bounds.Y && y <= ruleY && x >= Bounds.X && x <= Bounds.Right);
+        HitTest(x, y) >= 0 || detailsRect.Contains(x, y) || listArea.Contains(x, y) || TabZone(x, y);
+
+    bool TabZone(float x, float y) => Column ? x >= Bounds.X && x <= colRight && y >= Bounds.Y && y <= Bounds.Bottom
+                                             : y >= Bounds.Y && y <= ruleY && x >= Bounds.X && x <= Bounds.Right;
 
     public override void Click(int hit, int count, WidgetEnv e)
     {
@@ -301,10 +375,12 @@ internal sealed class MenuWidget : Widget
         if (listArea.Contains(x, y))
         {
             int count = tab < tabs.Count ? tabs[tab].items.Count : 0;
-            scroll = Math.Clamp(scroll + (delta > 0 ? -1 : 1), 0, Math.Max(0, count - visibleItems));
+            int step = Cards ? Math.Max(1, o.CardColumns) : 1;
+            scroll = Math.Clamp(scroll + (delta > 0 ? -step : step), 0, Math.Max(0, count - visibleItems + step - 1));
+            if (Cards) scroll -= scroll % step;
             return true;
         }
-        if (tabRects.Count > 0 && y <= ruleY && y >= Bounds.Y)
+        if (tabRects.Count > 0 && TabZone(x, y))
         {
             int next = Math.Clamp(tab + (delta > 0 ? -1 : 1), 0, Math.Max(0, tabs.Count - 1));
             if (next != tab) { tab = next; item = tabs[tab].items.Count > 0 ? 0 : -1; scroll = 0; remembered[key] = (tab, item); }
@@ -348,17 +424,26 @@ internal sealed class MenuWidget : Widget
         lastTime = e.Time;
         moving = false;
         var text = t[o.TabText]; var active = t[o.ActiveText]; var fill = t[o.ActiveColor];
+        // the panel behind it: its own Frame (auto = the theme's panel frame)
+        if (t.Frame(o.Frame, t.Options.Ui.PanelFrame) is { } panelBox) FramePainter.Draw(c, panelBox, t, Bounds, "", "", fontSize);
 
         // tabs
         for (int i = 0; i < tabs.Count && i < tabRects.Count; i++)
         {
             var r = tabRects[i];
             float a = Ease(Amount(i, Hover == i || tab == i, dt));
-            FramePainter.Draw(c, tabFrame, t, r, "", "", fontSize, a > 0, true, a);
+            Plates(c, tabFrame, tabActive, r, a);
             float x = r.X + o.TabPadding;
             var tc = Rgba.Lerp(text, active, a);
             var tb = tabs[i];
-            if (tb.icon.Length > 0)
+            if (o.TabStyle == "icons")
+            {
+                var ic = Rgba.Lerp(o.TabIconColor == "auto" ? text : t[o.TabIconColor], o.TabActiveIcon == "auto" ? active : t[o.TabActiveIcon], a);
+                var label = tb.icon.Length > 0 ? tb.icon : Up(tb.label)[..Math.Min(2, tb.label.Length)];
+                c.Text(label, new RectangleF(r.X, r.Y + (r.Height - fontSize * 1.7f) / 2, r.Width, fontSize * 1.9f), ic, font, fontSize * 1.35f, false, "center");
+                continue;
+            }
+            if (tb.icon.Length > 0 && o.TabStyle == "full")
             {
                 float box = o.IconBox > 0 ? o.IconBox : fontSize * 1.2f;
                 var br = new RectangleF(x - 4, r.Y + (r.Height - box) / 2, box, box);
@@ -374,7 +459,9 @@ internal sealed class MenuWidget : Widget
         }
 
         // rule
-        if (o.Rule != "none" && tabRects.Count > 0)
+        if (o.Rule != "none" && tabRects.Count > 0 && Column)
+            c.Fill(new RectangleF(colRight, Bounds.Y + 6, 1, Bounds.Height - 12), t[o.RuleColor], 0, 0.6f);
+        else if (o.Rule != "none" && tabRects.Count > 0)
         {
             var rc = t[o.RuleColor];
             var br = c.Brush(rc);
@@ -398,18 +485,18 @@ internal sealed class MenuWidget : Widget
         // heading
         if (headY >= 0)
         {
-            float hs = fontSize * o.HeadingScale, hx = Bounds.X + o.Inset, y = headY;
-            string ht = Up(cur.label);
-            if (o.HeadingShadow != "none") FramePainter.DrawText(c, ht, hx + 3, y + 3, hs * 1.36f, t[o.HeadingShadow], font, hs, false, o.HeadingSpacing, 0.6f);
-            FramePainter.DrawText(c, ht, hx, y, hs * 1.36f, t[o.HeadingColor], font, hs, false, o.HeadingSpacing);
+            float hs = fontSize * o.HeadingScale, hx = headX, y = headY;
+            string ht = HeadText(), hsub = HeadSub();
+            if (o.HeadingShadow != "none") FramePainter.DrawText(c, ht, hx + 3, y + 3, hs * 1.36f, t[o.HeadingShadow], font, hs, o.HeadingBold, o.HeadingSpacing, 0.6f);
+            FramePainter.DrawText(c, ht, hx, y, hs * 1.36f, t[o.HeadingColor], font, hs, o.HeadingBold, o.HeadingSpacing);
             y += hs * 1.36f + 8;
-            if (cur.sub.Length > 0) { FramePainter.DrawText(c, cur.sub.ToUpperInvariant(), hx, y, fontSize * 1.4f, t[o.SubtitleColor], font, fontSize, false, o.SubtitleSpacing); y += fontSize * 1.5f; }
+            if (hsub.Length > 0) { FramePainter.DrawText(c, hsub, hx, y, fontSize * 1.4f, t[o.SubtitleColor], font, fontSize, false, o.SubtitleSpacing); y += fontSize * 1.5f; }
             if (cur.desc.Length > 0) FramePainter.DrawText(c, cur.desc, hx, y, fontSize * 1.3f, t[o.SubtitleColor], font, fontSize * 0.86f, false, 0, 0.85f);
         }
 
         // rail + scroll bar
         int count = cur.items.Count;
-        if (o.RailColor != "none" && count > 0)
+        if (o.RailColor != "none" && count > 0 && !Cards)
         {
             int shown = Math.Min(count, visibleItems);
             float rx = listArea.X - 18 - o.RailWidth, top = listArea.Y, h = shown * (o.ItemHeight + o.ItemGap) - o.ItemGap;
@@ -436,10 +523,17 @@ internal sealed class MenuWidget : Widget
             var r = itemRects[i];
             if (r.IsEmpty) continue;
             float a = Ease(Amount(ItemBase + i, Hover == ItemBase + i || item == i, dt));
-            FramePainter.Draw(c, itemFrame, t, r, "", "", fontSize, a > 0, true, a);
+            Plates(c, itemFrame, itemActive, r, a);
             var tc = Rgba.Lerp(text, active, a);
+            if (Cards) { Card(c, e, cur.items[i], r, tc, a); continue; }
             float x = r.X + 16;
-            if (o.Bullet > 0)
+            if (o.Icons)
+            {
+                float isz = Math.Min(r.Height - 8, fontSize * 1.6f);
+                AppIcon(c, e, cur.items[i], new RectangleF(x, r.Y + (r.Height - isz) / 2, isz, isz));
+                x += isz + 10;
+            }
+            else if (o.Bullet > 0)
             {
                 c.Fill(new RectangleF(x, r.Y + (r.Height - o.Bullet) / 2, o.Bullet, o.Bullet), tc);
                 x += o.Bullet + 10;
@@ -476,6 +570,52 @@ internal sealed class MenuWidget : Widget
                 c.Text(label, new RectangleF(bx + b + 10, r.Y + (r.Height - fontSize * 1.36f) / 2, r.Width, fontSize * 1.5f), tc, font, fontSize, false, "left");
             }
         }
+    }
+
+    /// A plate: the frame (its hover fill wiping in when there's no active frame), then the active frame fading in.
+    void Plates(Canvas c, FrameOptions basis, FrameOptions? activeFrame, RectangleF r, float a)
+    {
+        if (activeFrame == null) { FramePainter.Draw(c, basis, t, r, "", "", fontSize, a > 0, true, a); return; }
+        FramePainter.Draw(c, basis, t, r, "", "", fontSize);
+        if (a <= 0.01f) return;
+        c.Dc.PushLayer(new Vortice.Direct2D1.LayerParameters1
+        {
+            ContentBounds = new Rect(r.X - 40, r.Y - 40, r.Width + 80, r.Height + 80), Opacity = Math.Clamp(a, 0, 1),
+            MaskTransform = System.Numerics.Matrix3x2.Identity, MaskAntialiasMode = Vortice.Direct2D1.AntialiasMode.PerPrimitive,
+        }, null);
+        FramePainter.Draw(c, activeFrame, t, r, "", "", fontSize);
+        c.Dc.PopLayer();
+    }
+
+    /// The shortcut's own icon (as the shortcuts panel shows it).
+    void AppIcon(Canvas c, WidgetEnv e, Shortcut s, RectangleF r)
+    {
+        var img = new Glyph.Ui.ImageEl
+        {
+            Key = "menu|" + s.IconKey + s.Image, Px = r.Width, Rows = 1, Style = "original",
+            Source = () => IconSource.Get(s, t.Name), X = r.X, Y = r.Y, W = r.Width, H = r.Height,
+        };
+        e.Painter.PaintVector(img, c, 0, 0, t["bg"], 0);
+    }
+
+    /// A card: icon, name and a line about it (its Description, or what kind of thing it is).
+    void Card(Canvas c, WidgetEnv e, Shortcut s, RectangleF r, Rgba tc, float a)
+    {
+        float pad = 12, x = r.X + pad, y = r.Y + pad;
+        if (o.Icons)
+        {
+            float isz = Math.Min(28, r.Height * 0.3f);
+            AppIcon(c, e, s, new RectangleF(x, y, isz, isz));
+            c.Text(s.ToString(), new RectangleF(x + isz + 8, y + (isz - fontSize * 1.4f) / 2, r.Right - x - isz - 8 - pad, fontSize * 1.5f), tc, font, fontSize, true, "left");
+            y += isz + 6;
+        }
+        else
+        {
+            c.Text(s.ToString(), new RectangleF(x, y, r.Width - 2 * pad, fontSize * 1.5f), tc, font, fontSize, true, "left");
+            y += fontSize * 1.6f;
+        }
+        var about = s.Description.Length > 0 ? s.Description : Kind(s);
+        c.Text(about, new RectangleF(x, y, r.Width - 2 * pad, r.Bottom - y - pad), Rgba.Lerp(t[o.LabelColor], tc, a * 0.5f), font, fontSize * 0.86f, false, "left", true);
     }
 
     string Fit(Canvas c, string s, float w)

@@ -94,6 +94,9 @@ internal sealed class BackdropOptions
     [Description("Darken the picture (0 = not at all, 1 = black)."), Range(0, 1)]
     public float Dim { get; set; }
 
+    [DisplayName("Tint"), Description("A colour laid over the picture or gradient (smooth themes), e.g. a red or violet wash for a night mood. none = no tint."), Color, TypeConverter(typeof(ColorNameConverter))] public string Tint { get; set; } = "none";
+    [DisplayName("Tint amount"), Description("How strong the tint is: 0 = none, 1 = only the tint colour."), Range(0, 1)] public float TintAmount { get; set; } = 0.25f;
+    [DisplayName("Tint fade"), Description("Fade the tint towards the top or bottom of the screen: none = even, bottom = strongest at the bottom, top = strongest at the top."), Choices("none", "bottom", "top"), TypeConverter(typeof(ChoicesConverter))] public string TintFade { get; set; } = "none";
     [DisplayName("Pattern"), Description("A pattern drawn over the whole backdrop (smooth themes): dots, lines, a grid… none = no pattern."), Choices("none", "scanlines", "grid", "dots", "crosses", "diagonal", "crosshatch", "vlines"), TypeConverter(typeof(ChoicesConverter))]
     public string Pattern { get; set; } = "none";
     [DisplayName("Pattern colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string PatternColor { get; set; } = "line";

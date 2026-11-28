@@ -69,6 +69,10 @@ internal sealed class FrameOptions
     [Category("3. Fill"), DisplayName("Hover fill"), Description("Fill colour under the mouse, when it does something on click. none = no change."), Color, TypeConverter(typeof(ColorNameConverter))] public string HoverFill { get; set; } = "none";
     [Category("3. Fill"), DisplayName("Text colour"), Description("Colour of the text inside (bar modules, buttons). none = the text's own colour. Set it for dark fills on a light theme (or the other way round)."), Color, TypeConverter(typeof(ColorNameConverter))] public string TextColor { get; set; } = "none";
     [Category("3. Fill"), DisplayName("Hover text"), Description("Colour of the text inside (bar modules, buttons) while the mouse is over it. none = unchanged. Set it when Hover fill is close to the text colour."), Color, TypeConverter(typeof(ColorNameConverter))] public string HoverText { get; set; } = "none";
+    [Category("3. Fill"), Description("A soft light that follows the mouse across the box and brightens its edge near the mouse. none = no spotlight. Smooth style."), Color, TypeConverter(typeof(ColorNameConverter))] public string Spotlight { get; set; } = "none";
+    [Category("3. Fill"), DisplayName("Spotlight size"), Description("Radius of the light, in pixels."), Range(10, 2000)] public float SpotlightSize { get; set; } = 180;
+    [Category("3. Fill"), DisplayName("Spotlight strength"), Description("How bright the light is inside the box."), Range(0, 1)] public float SpotlightStrength { get; set; } = 0.14f;
+    [Category("3. Fill"), DisplayName("Spotlight edge"), Description("How much the box's edge lights up near the mouse."), Range(0, 1)] public float SpotlightEdge { get; set; } = 0.8f;
     [Category("3. Fill"), DisplayName("Hover wipe"), Description("The hover fill slides in from the left over this many milliseconds instead of appearing at once. 0 = at once. Used by menus and lists that animate."), Range(0, 2000)] public float HoverWipe { get; set; }
 
     [Category("4. Border"), Description("Border colour. none = no border."), Color, TypeConverter(typeof(ColorNameConverter))] public string Border { get; set; } = "line";
@@ -94,6 +98,8 @@ internal sealed class FrameOptions
     [Category("5. Title"), DisplayName("Strip opacity"), Range(0, 1)] public float HeaderOpacity { get; set; } = 1;
     [Category("5. Title"), DisplayName("Strip height"), Description("bar and tab: height of the strip. 0 = fit the title."), Range(0, 200)] public float HeaderHeight { get; set; }
     [Category("5. Title"), DisplayName("Line under title"), Description("A line under the title strip. none = no line."), Color, TypeConverter(typeof(ColorNameConverter))] public string HeaderLine { get; set; } = "none";
+    [Category("5. Title"), DisplayName("Line ticks"), Description("line and above titles: this many small upright marks spread along the title's line (the ends get one too), like a ruler. 0 = a plain line."), Range(0, 60)] public int LineTicks { get; set; }
+    [Category("5. Title"), DisplayName("Tick height"), Description("Height of the line's marks, in pixels."), Range(1, 60)] public float LineTickHeight { get; set; } = 7;
     [Category("5. Title"), DisplayName("Tab width"), Description("tab: width of the tab. 0 = fit the title."), Range(0, 2000)] public float TabWidth { get; set; }
     [Category("5. Title"), DisplayName("Tab slant"), Description("tab: how far the tab's right side leans out, in pixels."), Range(0, 200)] public float TabSlant { get; set; } = 10;
     [Category("5. Title"), DisplayName("Tab offset"), Description("tab: distance from the box's left edge."), Range(0, 2000)] public float TabOffset { get; set; }
@@ -253,6 +259,24 @@ internal static class FramePainter
         }, null);
     }
 
+    /// Where the mouse is while widgets are drawn (for spotlights); null = not over the desktop.
+    public static PointF? Mouse;
+
+    static void SpotlightOn(Canvas c, FrameOptions f, Theme t, ID2D1Geometry shape, RectangleF box, bool edge)
+    {
+        if (f.Spotlight == "none" || Mouse is not PointF m) return;
+        float r = f.SpotlightSize;
+        if (!RectangleF.Inflate(box, r * 0.6f, r * 0.6f).Contains(m)) return;
+        var col = t[f.Spotlight];
+        float a = edge ? f.SpotlightEdge : f.SpotlightStrength;
+        if (a <= 0) return;
+        var stops = new[] { new GradientStop { Position = 0, Color = C(col, a) }, new GradientStop { Position = 1, Color = C(col, 0) } };
+        using var coll = c.Dc.CreateGradientStopCollection(stops);
+        using var br = c.Dc.CreateRadialGradientBrush(new RadialGradientBrushProperties(new Vector2(m.X, m.Y), Vector2.Zero, r, r), coll);
+        if (edge) c.Dc.DrawGeometry(shape, br, Math.Max(1, f.BorderWidth) + 0.5f);
+        else c.Dc.FillGeometry(shape, br);
+    }
+
     /// Draws the frame in `outer` (which includes a tab or an above-title). `fill` = false skips the inside
     /// (windows: their own contents are there).
     public static void Draw(Canvas c, FrameOptions f, Theme t, RectangleF outer, string title, string titleRight, float baseSize,
@@ -321,6 +345,8 @@ internal static class FramePainter
             }
         }
 
+        if (fill) SpotlightOn(c, f, t, shape, box, false);
+
         // title strip (bar)
         float tw = hasTitle ? MeasureText(c, title, tfont, tsize, f.TitleBold, f.TitleSpacing) : 0;
         float p = PadX(f, t), bw = f.Border != "none" ? f.BorderWidth : 0;
@@ -366,6 +392,7 @@ internal static class FramePainter
             }
             style?.Dispose();
         }
+        if (f.Border != "none" || f.Spotlight != "none") SpotlightOn(c, f, t, shape, box, true);
         if (f.InnerBorder != "none" && f.InnerOpacity > 0)
         {
             using var inner = Outline(fac, box, f, radius, f.BorderWidth + f.InnerGap + 0.5f);
@@ -399,7 +426,7 @@ internal static class FramePainter
             {
                 var lc = t[f.HeaderLine != "none" ? f.HeaderLine : f.Border != "none" ? f.Border : f.TitleColor];
                 float lx0 = x + tw + tsize * 0.7f, lx1 = box.Right - p - bw - slantPad - (rw > 0 ? rw + tsize * 0.7f : 0);
-                if (lx1 > lx0) dc.FillRectangle(new Rect(lx0, y + lh / 2, lx1 - lx0, 1), c.Brush(lc));
+                if (lx1 > lx0) { dc.FillRectangle(new Rect(lx0, y + lh / 2, lx1 - lx0, 1), c.Brush(lc)); LineTicks(c, f, lc, lx0, lx1, y + lh / 2); }
             }
         }
         else if (hasTitle && f.Header == "above")
@@ -410,7 +437,7 @@ internal static class FramePainter
             if (rw > 0) DrawText(c, titleRight, box.Right - rw, outer.Y, lh * 0.8f, t[f.TitleRightColor], tfont, tsize * 0.9f, false, f.TitleSpacing);
             var lc = t[f.HeaderLine != "none" ? f.HeaderLine : f.Border != "none" ? f.Border : f.TitleColor];
             float lx0 = box.X + tw + tsize * 0.7f, lx1 = Math.Max(box.Right, lx0 + tsize * 4) - (rw > 0 ? rw + tsize * 0.7f : 0);
-            if (lx1 > lx0) dc.FillRectangle(new Rect(lx0, outer.Y + lh * 0.4f, lx1 - lx0, 1), c.Brush(lc));
+            if (lx1 > lx0) { dc.FillRectangle(new Rect(lx0, outer.Y + lh * 0.4f, lx1 - lx0, 1), c.Brush(lc)); LineTicks(c, f, lc, lx0, lx1, outer.Y + lh * 0.4f); }
         }
 
         // stripe
@@ -509,6 +536,21 @@ internal static class FramePainter
                     default: dc.FillRectangle(new Rect(box.Right, q, l, 1), tb); break;
                 }
             }
+        }
+    }
+
+    /// Small upright marks along a title line: one at each end and LineTicks between.
+    static void LineTicks(Canvas c, FrameOptions f, Rgba col, float x0, float x1, float y)
+    {
+        if (f.LineTicks <= 0) return;
+        var br = c.Brush(col);
+        float h = f.LineTickHeight;
+        int n = f.LineTicks + 1;
+        for (int i = 0; i <= n; i++)
+        {
+            float x = x0 + (x1 - x0) * i / n;
+            float hh = i == 0 || i == n ? h : h * 0.6f;
+            c.Dc.FillRectangle(new Rect(Math.Min(x, x1 - 1), y - hh / 2, 1, hh), br);
         }
     }
 

@@ -71,12 +71,45 @@ internal abstract class PanelWidget : Widget
             if (k is ButtonEl) yield return new Part("Buttons", PxRect(k, env), own, "theme:ButtonFrame");
     }
 
+    // hover reveal: 0 = closed, 1 = showing the Hover text lines
+    float reveal, revealAt = -1;
+    bool revealing;
+    public override bool Animated => revealing;
+    public override bool OnTop => reveal > 0;
+
+    static float Smooth(float a) => a * a * (3 - 2 * a);
+
     public override void Layout(WidgetEnv e)
+    {
+        float dt = revealAt < 0 ? 0 : Math.Clamp(e.Time - revealAt, 0, 0.2f);
+        revealAt = e.Time;
+        if (P.HoverText.Length == 0) { reveal = 0; revealing = false; LayoutCore(e, false); return; }
+        float target = MouseOver ? 1 : 0;
+        if (P.RevealTime <= 0) reveal = target;
+        else reveal = target > reveal ? Math.Min(1, reveal + dt * 1000 / P.RevealTime) : Math.Max(0, reveal - dt * 1000 / P.RevealTime);
+        revealing = reveal != target;
+        if (e.Painter.Terminal || reveal <= 0 || reveal >= 1) { LayoutCore(e, reveal >= 0.5f); return; }
+        // part way: the box between its closed and open size (the contents are laid out open and clipped)
+        LayoutCore(e, false);
+        var closed = Bounds;
+        LayoutCore(e, true);
+        var open = Bounds;
+        float k = Smooth(reveal);
+        Bounds = new RectangleF(closed.X + (open.X - closed.X) * k, closed.Y + (open.Y - closed.Y) * k,
+                                closed.Width + (open.Width - closed.Width) * k, closed.Height + (open.Height - closed.Height) * k);
+    }
+
+    void LayoutCore(WidgetEnv e, bool withHover)
     {
         layoutEnv = e;
         var p = e.Painter;
         Scale(e);
         root = Build(e);
+        if (withHover && root != null)
+        {
+            root.Items.Add(new GapEl(p.Terminal ? 0 : 0.35f));
+            foreach (var line in Fmt.Lines(S(P.HoverText, Dim))) root.Items.Add(new TextEl { Spans = line, Size = TextSize.Small });
+        }
         visible = root != null;
         if (root == null) { Bounds = RectangleF.Empty; clickables.Clear(); return; }
         title = P.Title.Length > 0 ? V(P.Title) : "";
@@ -219,6 +252,14 @@ internal abstract class PanelWidget : Widget
     static string Trunc(string s, int n) => n <= 1 ? "" : s.Length <= n ? s : s[..(n - 1)] + "…";
 
     public override void DrawVector(Canvas c, WidgetEnv e)
+    {
+        bool clip = reveal > 0 && reveal < 1 && !e.Painter.Terminal;
+        if (clip) c.Dc.PushAxisAlignedClip(new Vortice.Mathematics.Rect(Bounds.X - 30, Bounds.Y - 30, Bounds.Width + 60, Bounds.Height + 30), Vortice.Direct2D1.AntialiasMode.Aliased);
+        try { DrawPanel(c, e); }
+        finally { if (clip) c.Dc.PopAxisAlignedClip(); }
+    }
+
+    void DrawPanel(Canvas c, WidgetEnv e)
     {
         if (!visible || root == null) return;
         var p = e.Painter;
@@ -386,7 +427,7 @@ internal sealed class MediaWidget : PanelWidget
 
     static readonly object Gate = new();
 
-    public override bool Animated => o.Visualiser && Spectrum.Moving;
+    public override bool Animated => base.Animated || (o.Visualiser && Spectrum.Moving);
     public int Fps => o.VisualiserFps;
 }
 

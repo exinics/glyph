@@ -206,6 +206,9 @@ internal sealed class Theme
 
     public static string FilePath(string name) => Path.Combine(Paths.ThemeDir(name), "theme.toml");
 
+    /// True if any of the theme's frames has a spotlight (then the desktop redraws as the mouse moves over widgets).
+    public bool AnySpotlight => Frames.Any(f => f.Spotlight != "none");
+
     public static Theme Load(string name, List<string> problems)
     {
         var t = new Theme(name);

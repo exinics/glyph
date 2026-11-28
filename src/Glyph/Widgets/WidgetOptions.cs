@@ -15,7 +15,7 @@ internal sealed class WidgetsFile
         ["media"] = () => new MediaOptions(), ["calendar"] = () => new CalendarOptions(), ["weather"] = () => new WeatherOptions(),
         ["text"] = () => new TextOptions(), ["command"] = () => new CommandOptions(), ["sysinfo"] = () => new SysInfoOptions(),
         ["image"] = () => new ImageOptions(), ["video"] = () => new VideoOptions(), ["audio"] = () => new AudioOptions(),
-        ["feed"] = () => new FeedOptions(), ["menu"] = () => new MenuOptions(), ["divider"] = () => new DividerOptions(),
+        ["feed"] = () => new FeedOptions(), ["menu"] = () => new MenuOptions(), ["divider"] = () => new DividerOptions(), ["themes"] = () => new ThemesOptions(), ["toggles"] = () => new TogglesOptions(),
     };
 
     /// Short descriptions for the settings window's "Add widget" menu and the guide.
@@ -28,6 +28,8 @@ internal sealed class WidgetsFile
         ["feed"] = "lines that keep coming in: made-up hex, logs or values (a live-looking readout)",
         ["menu"] = "a menu screen: your shortcut groups as tabs, the chosen group's shortcuts as a list, details of the chosen one",
         ["divider"] = "a line across or down the screen: solid, dashed, dotted, double or a printed-form band",
+        ["themes"] = "cards for your themes (wallpaper picture, colours, name); click one to switch to it",
+        ["toggles"] = "quick buttons (Wi-Fi, Bluetooth, mute, snip, lock…) that light up when on and rise under the mouse",
     };
 
     public static string FilePath(string theme) => Path.Combine(Paths.ThemeDir(theme), "widgets.toml");
@@ -85,6 +87,13 @@ internal abstract class WidgetOptions
     [Category("Box"), Description("Font for this box's text (smooth style). Empty = the theme's font. Fonts in config\\fonts are listed too."), TypeConverter(typeof(FontNameConverter))] public string Font { get; set; } = "";
     [Category("Box"), DisplayName("Font size"), Description("Text size for this box, in pixels. 0 = the theme's."), Range(0, 96)] public float FontSize { get; set; }
     [Category("Box"), DisplayName("Hover colour"), Description("If the box does something on click, it lights up in this colour under the mouse. none = no highlight."), Color, TypeConverter(typeof(ColorNameConverter))] public string BoxHoverColor { get; set; } = "none";
+    [Category("Transform"), DisplayName("Tilt X"), Description("Smooth style: lean the panel back (positive) or forward (negative) in 3D, in degrees, like a sign seen from below or above."), Range(-80, 80)] public float TiltX { get; set; }
+    [Category("Transform"), DisplayName("Tilt Y"), Description("Smooth style: turn the panel in 3D around its upright middle, in degrees: positive = its right side goes back (good for a panel on the left of the screen), negative = its left side goes back."), Range(-80, 80)] public float TiltY { get; set; }
+    [Category("Transform"), DisplayName("Depth"), Description("How strong the 3D look of a tilt is: smaller = stronger perspective, in pixels of distance."), Range(100, 20000)] public float Depth { get; set; } = 1600;
+    [Category("Transform"), DisplayName("Tilt to mouse"), Description("Smooth style: while the mouse is over it, the panel tilts in 3D towards where the mouse is, up to this many degrees (like a card you press on), and settles back when the mouse leaves. 0 = off."), Range(0, 45)] public float TiltFollow { get; set; }
+    [Category("Transform"), DisplayName("Tilt around"), Description("Tilt as part of another widget (its Name): the tilt turns around that widget's middle, so several widgets lean together like one surface (give them all the same Tilt). Empty = around its own middle.")] public string TiltAround { get; set; } = "";
+    [Category("Transform"), Description("Turn the panel flat on the screen, in degrees (e.g. 90 or -90 for sideways text)."), Range(-360, 360)] public float Rotate { get; set; }
+    [Category("Transform"), DisplayName("Opacity"), Description("See-through-ness of the whole panel and everything in it: 1 = solid, 0.1 = a faint watermark."), Range(0, 1)] public float Alpha { get; set; } = 1;
     [Category("Link"), DisplayName("Link to"), Description("Draw a line from this panel to the panel with this Name (like a callout). Empty = no line. Smooth style.")] public string LinkTo { get; set; } = "";
     [Category("Link"), DisplayName("Link colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string LinkColor { get; set; } = "accent_dim";
     [Category("Link"), DisplayName("Link width"), Range(0.5, 20)] public float LinkWidth { get; set; } = 1;
@@ -111,6 +120,7 @@ internal sealed class ShortcutsOptions : WidgetOptions
     [Category("Panel"), Description("Title shown on the panel. Empty = none.")] public string Title { get; set; } = "";
     [Category("Panel"), Description("Draw a panel behind the shortcuts.")] public bool Panel { get; set; } = true;
     [Category("Panel"), Description("Only show shortcuts in this group. Empty = all shortcuts.")] public string Group { get; set; } = "";
+    [Category("Panel"), Description("Or: just these shortcuts, by name, in this order (e.g. for a dock). Empty = use Group."), TypeConverter(typeof(ListConverter))] public string[] Names { get; set; } = Array.Empty<string>();
     [Category("Panel"), Description("Number of columns."), Range(1, 50)] public int Columns { get; set; } = 3;
     [Category("Panel"), DisplayName("Open with"), Description("double_click like Windows, or a single click."), Choices("double_click", "click"), TypeConverter(typeof(ChoicesConverter))]
     public string Launch { get; set; } = "double_click";
@@ -129,6 +139,11 @@ internal sealed class ShortcutsOptions : WidgetOptions
     [Category("Icons"), DisplayName("Mono colour"), Description("For the mono style."), Color, TypeConverter(typeof(ColorNameConverter))]
     public string IconColor { get; set; } = "accent";
 
+    [Category("Icons"), Description("Smooth style: icons swell under the mouse, the nearest most (like a dock): 1 = off, 1.6 = up to 60% bigger."), Range(1, 4)] public float Magnify { get; set; } = 1;
+    [Category("Icons"), DisplayName("Magnify reach"), Description("How far from the mouse icons still grow, in pixels."), Range(20, 1000)] public float MagnifyRange { get; set; } = 110;
+    [Category("Labels"), DisplayName("Name on hover"), Description("Smooth style: show the name of the icon under the mouse in a little tag above it (handy with labels off).")] public bool HoverLabel { get; set; }
+    [Category("Labels"), DisplayName("Tag colour"), Description("Background of the hover tag."), Color, TypeConverter(typeof(ColorNameConverter))] public string TagColor { get; set; } = "surface";
+    [Category("Labels"), DisplayName("Tag border"), Color, TypeConverter(typeof(ColorNameConverter))] public string TagBorder { get; set; } = "accent";
     [Category("Labels"), DisplayName("Show labels")] public bool ShowLabels { get; set; } = true;
     [Category("Labels"), DisplayName("Label lines"), Description("How many lines a long name may take."), Range(1, 3)] public int LabelLines { get; set; } = 2;
     [Category("Labels"), DisplayName("Label colour"), Color, TypeConverter(typeof(ColorNameConverter))] public string LabelColor { get; set; } = "text";
@@ -152,6 +167,8 @@ internal abstract class PanelOptions : WidgetOptions
     [Category("Colours"), DisplayName("Accent colour"), Description("Highlights, meters, graphs."), Color, TypeConverter(typeof(ColorNameConverter))] public string AccentColor { get; set; } = "accent";
     [Category("Colours"), DisplayName("Dim colour"), Description("Labels and less important text."), Color, TypeConverter(typeof(ColorNameConverter))] public string DimColor { get; set; } = "dim";
     [Category("Panel"), DisplayName("On click"), Description(Glyph.Data.Actions.Help)] public string OnClick { get; set; } = "";
+    [Category("Panel"), DisplayName("Hover text"), Description("Extra lines the panel grows to show while the mouse is over it, with {values} and [colour]…[/] markup (\\n = new line). Empty = nothing extra.")] public string HoverText { get; set; } = "";
+    [Category("Panel"), DisplayName("Reveal time"), Description("Milliseconds the panel takes to grow (and shrink back)."), Range(0, 3000)] public float RevealTime { get; set; } = 220;
     public override string ToString() => $"{Type}{(Title.Length > 0 ? ": " + Title : "")}{(Enabled ? "" : " (off)")}";
 }
 

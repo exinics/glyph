@@ -145,6 +145,11 @@ internal static class Stats
             case "uptime": return Fmt.Duration(TimeSpan.FromMilliseconds(Environment.TickCount64));
             case "window": return Fmt.Trunc(ActiveWindowTitle(), spec);
             case "window_app": return Fmt.Trunc(Tasks.ForegroundApp(), spec);
+            case "greeting":
+                {
+                    int h = DateTime.Now.Hour;
+                    return h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+                }
         }
         if (name.StartsWith("media")) return Media.Value(name, spec);
         if (name is "wifi" or "wifi_signal" or "network" or "bluetooth" or "lang" or "lang_full") return Status.Value(name, spec);

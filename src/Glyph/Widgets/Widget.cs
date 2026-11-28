@@ -17,6 +17,9 @@ internal sealed class WidgetEnv
     public Glyph.Ui.Painter Painter = new();
     public Canvas? Canvas;
     public float BaseFontSize = 13;
+    /// Where the mouse is (same pixels as Bounds) and whether it's over the desktop at all.
+    public float MouseX = -1e6f, MouseY = -1e6f;
+    public bool MouseOn;
 }
 
 /// One clickable part of a widget for the Design page: where it is, which option categories belong to it
@@ -30,6 +33,12 @@ internal abstract class Widget : IDisposable
 {
     public RectangleF Bounds;      // pixels, worked out by Layout
     public int Hover = -1;          // item under the mouse
+    public bool MouseOver;          // the mouse is over the widget (anywhere on it)
+    /// Drawn after the others this frame (e.g. a panel growing to show more under the mouse).
+    public virtual bool OnTop => false;
+    /// True if it changes as the mouse moves over it (tilt that follows the mouse, spotlights, magnifying icons):
+    /// then every mouse move over it redraws the desktop.
+    public virtual bool FollowsMouse => Opt != null && Opt.TiltFollow > 0;
     public int FileIndex = -1;      // position in widgets.toml (the editor uses it)
     public WidgetOptions Opt = null!;
     public virtual bool Animated => false;
@@ -97,6 +106,8 @@ internal abstract class Widget : IDisposable
         FeedOptions fd => new FeedWidget(fd, theme),
         MenuOptions mn => new MenuWidget(mn, theme, shortcuts),
         DividerOptions dv => new DividerWidget(dv, theme),
+        ThemesOptions th => new ThemesWidget(th, theme),
+        TogglesOptions tg => new TogglesWidget(tg, theme),
         _ => throw new ArgumentException("unknown widget " + o.Type),
     };
 }
