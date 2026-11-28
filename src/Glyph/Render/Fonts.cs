@@ -21,10 +21,14 @@ internal static class Fonts
 
     static readonly string[] Kinds = { ".ttf", ".otf", ".ttc", ".otc" };
 
+    /// Font files Glyph uses (none are installed into Windows): its own, configonts, and each theme's own
+    /// fonts folder (config	hemes\<name>onts), so a theme folder copied to another PC brings its fonts along.
     public static List<string> Files()
     {
         var res = new List<string>();
-        foreach (var d in new[] { BuiltInDir, UserDir })
+        var dirs = new List<string> { BuiltInDir, UserDir };
+        try { if (Directory.Exists(Paths.Themes)) dirs.AddRange(Directory.GetDirectories(Paths.Themes).Select(t => Path.Combine(t, "fonts"))); } catch { }
+        foreach (var d in dirs)
             try { if (Directory.Exists(d)) res.AddRange(Directory.EnumerateFiles(d, "*", SearchOption.AllDirectories).Where(f => Kinds.Contains(Path.GetExtension(f).ToLowerInvariant()))); }
             catch { }
         return res;

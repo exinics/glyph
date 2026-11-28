@@ -113,7 +113,7 @@ internal sealed class LyricsOptions : PanelOptions
     [Category("Lyrics"), DisplayName("Current bold")] public bool CurrentBold { get; set; } = true;
     [Category("Lyrics"), DisplayName("Fade far lines"), Description("Lines further from the current one get fainter.")] public bool Fade { get; set; } = true;
     [Category("Lyrics"), Description("Seconds to shift the lyrics by if they come early (negative) or late (positive)."), Range(-10, 10)] public float Offset { get; set; }
-    [Category("Lyrics"), DisplayName("Hide when nothing plays")] public bool HideWhenIdle { get; set; } = true;
+    [Category("Lyrics"), DisplayName("Hide when nothing plays"), Description("(The widget is empty anyway while nothing plays or the words are being looked up.)")] public bool HideWhenIdle { get; set; } = true;
 }
 
 /// The words of the song playing, the line being sung highlighted (time-synced lyrics from lrclib.net).
@@ -128,11 +128,7 @@ internal sealed class LyricsWidget : PanelWidget
         if (!Media.HasSession && o.HideWhenIdle) return null;
         var col = new ColEl();
         var (lines, cur) = Lyrics.Around(o.Before, o.After, o.Offset);
-        if (lines.Count == 0)
-        {
-            col.Items.Add(new TextEl(Media.HasSession ? (Lyrics.Status.Length > 0 ? Lyrics.Status : "…") : "nothing playing", Dim) { Size = TextSize.Small });
-            return col;
-        }
+        if (lines.Count == 0) return null;   // nothing playing, looking them up, or none found: just empty
         float maxW = o.Width > 0 ? o.Width - 4 : 360;
         for (int i = 0; i < lines.Count; i++)
         {

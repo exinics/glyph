@@ -13,8 +13,14 @@ internal sealed class AppSettings
     [Category("Glyph"), DisplayName("Start with Windows"), Description("Start Glyph when you sign in.")]
     public bool StartWithWindows { get; set; }
 
-    [Category("Glyph"), DisplayName("Close Wallpaper Engine"), Description("Close Wallpaper Engine while Glyph draws the wallpaper itself. Themes whose backdrop is a Wallpaper Engine wallpaper (Wallpaper > Backdrop > Type: wallpaper_engine) start it instead and draw on top of it.")]
+    [Browsable(false), Description("Old setting, no longer used (see Wallpaper Engine for themes / Wallpaper Engine under a theme).")]
     public bool CloseWallpaperEngine { get; set; } = true;
+
+    [Category("Wallpaper Engine"), DisplayName("Wallpaper Engine for themes"), Description("When a theme shows a Wallpaper Engine wallpaper under its widgets and Wallpaper Engine isn't showing it: ask = ask first (the theme shows the wallpaper's still picture until then). open = open it in Wallpaper Engine (starting it if needed) and say so. never = never start or change Wallpaper Engine (the still picture is shown)."), Glyph.Options.Choices("ask", "open", "never"), TypeConverter(typeof(ChoicesConverter))]
+    public string WallpaperEngineThemes { get; set; } = "ask";
+
+    [Category("Wallpaper Engine"), DisplayName("Wallpaper Engine under a theme"), Description("When Wallpaper Engine plays a wallpaper on a screen where the theme draws its own background (so you can't see it, but it still uses your graphics card): ask = ask what to do. close = try to close Wallpaper Engine (it's never forced: if it stays open, its hidden wallpapers are taken off instead). remove = take its wallpaper off just those screens (it keeps running for the others). leave = leave it alone."), Glyph.Options.Choices("ask", "close", "remove", "leave"), TypeConverter(typeof(ChoicesConverter))]
+    public string WallpaperEngineHidden { get; set; } = "ask";
 
     [Category("Glyph"), DisplayName("Hide Windows desktop icons"), Description("Hide Windows' own desktop icons while Glyph runs (shortcut panels replace them). They come back when Glyph quits.")]
     public bool HideDesktopIcons { get; set; } = true;
@@ -25,8 +31,8 @@ internal sealed class AppSettings
     [Category("Glyph"), DisplayName("Theme sync"), Description("Let themes change Windows Terminal's colours and Windows' accent colour and dark mode (each theme's [sync] says what). Off = put all of it back as it was.")]
     public bool ThemeSync { get; set; } = true;
 
-    [Category("Updates"), DisplayName("Updates"), Description("auto = get new versions from GitHub by itself (Glyph restarts for a moment). ask = say when there's one (tray menu > Update). off = never look."), Glyph.Options.Choices("auto", "ask", "off"), TypeConverter(typeof(ChoicesConverter))]
-    public string Updates { get; set; } = "auto";
+    [Category("Updates"), DisplayName("Updates"), Description("ask = a notification when there's a new version: click it (or Update in the tray menu) to update. auto = get new versions by itself (Glyph restarts for a moment). off = never look."), Glyph.Options.Choices("ask", "auto", "off"), TypeConverter(typeof(ChoicesConverter))]
+    public string Updates { get; set; } = "ask";
 
     [Category("Updates"), DisplayName("Update from"), Description("The GitHub project new versions come from (owner/name).")]
     public string UpdateRepo { get; set; } = "exinics/glyph";

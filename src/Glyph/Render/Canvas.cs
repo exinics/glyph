@@ -187,7 +187,7 @@ internal sealed class Canvas : IDisposable
     }
 
     /// A picture from disk, scaled to fill the area as `fit` says; optionally darkened.
-    public void Picture(string path, RectangleF area, string fit, float dim)
+    public void Picture(string path, RectangleF area, string fit, float dim, bool soften = false)
     {
         if (!File.Exists(path)) return;
         var size = PictureSize(path);
@@ -201,7 +201,18 @@ internal sealed class Canvas : IDisposable
         float sx = area.Width / w, sy = area.Height / h;
         float s = fit switch { "contain" => Math.Min(sx, sy), "center" => 1f, "stretch" => 1f, _ => Math.Max(sx, sy) };
         RectangleF dest = fit == "stretch" ? area : new RectangleF(area.X + (area.Width - w * s) / 2, area.Y + (area.Height - h * s) / 2, w * s, h * s);
-        Draw(bmp, dest);
+        var (_, bw, bh) = bitmaps[key];
+        float up = dest.Width / Math.Max(1, bw);
+        if (soften && up > 1.5f)
+        {
+            // a small picture blown up: blurred by about one of its own pixels, so it reads as soft, not blocky
+            using var blur = new Vortice.Direct2D1.Effects.GaussianBlur(Dc) { StandardDeviation = 1.1f, BorderMode = Vortice.Direct2D1.BorderMode.Hard };
+            blur.SetInput(0, bmp, true);
+            var t0 = Dc.Transform;
+            Dc.Transform = System.Numerics.Matrix3x2.CreateScale(up, dest.Height / Math.Max(1, bh)) * System.Numerics.Matrix3x2.CreateTranslation(dest.X, dest.Y) * t0;
+            try { Dc.DrawImage(blur, interpolationMode: Vortice.Direct2D1.InterpolationMode.HighQualityCubic); } finally { Dc.Transform = t0; }
+        }
+        else Draw(bmp, dest);
         if (dim > 0) Fill(area, new Rgba(0, 0, 0), 0, dim);
     }
 

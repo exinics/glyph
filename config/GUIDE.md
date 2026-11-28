@@ -540,11 +540,13 @@ lower-case name in the first column; a section like `[ui]` is the part of the fi
 |---|---|---|---|
 | `theme` | `"operator"` |  | Which theme folder in config\themes is shown |
 | `start_with_windows` | `false` | true, false | **Start with Windows.** Start Glyph when you sign in. |
-| `close_wallpaper_engine` | `true` | true, false | **Close Wallpaper Engine.** Close Wallpaper Engine while Glyph draws the wallpaper itself. Themes whose backdrop is a Wallpaper Engine wallpaper (Wallpaper > Backdrop > Type: wallpaper_engine) start it instead and draw on top of it. |
+| `close_wallpaper_engine` | `true` | true, false | Old setting, no longer used (see Wallpaper Engine for themes / Wallpaper Engine under a theme). |
+| `wallpaper_engine_themes` | `"ask"` | ask, open, never | **Wallpaper Engine for themes.** When a theme shows a Wallpaper Engine wallpaper under its widgets and Wallpaper Engine isn't showing it: ask = ask first (the theme shows the wallpaper's still picture until then). open = open it in Wallpaper Engine (starting it if needed) and say so. never = never start or change Wallpaper Engine (the still picture is shown). |
+| `wallpaper_engine_hidden` | `"ask"` | ask, close, remove, leave | **Wallpaper Engine under a theme.** When Wallpaper Engine plays a wallpaper on a screen where the theme draws its own background (so you can't see it, but it still uses your graphics card): ask = ask what to do. close = try to close Wallpaper Engine (it's never forced: if it stays open, its hidden wallpapers are taken off instead). remove = take its wallpaper off just those screens (it keeps running for the others). leave = leave it alone. |
 | `hide_desktop_icons` | `true` | true, false | **Hide Windows desktop icons.** Hide Windows' own desktop icons while Glyph runs (shortcut panels replace them). They come back when Glyph quits. |
 | `taskbar` | `"keep"` | keep, autohide, hide | **Windows taskbar.** keep = leave it as it is. autohide = hide it until the mouse touches the screen edge. hide = hide it completely (Glyph's bar replaces it; the Start menu still opens with the Win key). Restored when Glyph quits. |
 | `theme_sync` | `true` | true, false | **Theme sync.** Let themes change Windows Terminal's colours and Windows' accent colour and dark mode (each theme's [sync] says what). Off = put all of it back as it was. |
-| `updates` | `"auto"` | auto, ask, off | **Updates.** auto = get new versions from GitHub by itself (Glyph restarts for a moment). ask = say when there's one (tray menu > Update). off = never look. |
+| `updates` | `"ask"` | ask, auto, off | **Updates.** ask = a notification when there's a new version: click it (or Update in the tray menu) to update. auto = get new versions by itself (Glyph restarts for a moment). off = never look. |
 | `update_repo` | `"exinics/glyph"` |  | **Update from.** The GitHub project new versions come from (owner/name). |
 
 ### glyph.toml [performance]
@@ -2613,7 +2615,7 @@ the words of the song playing, the line being sung highlighted (synced lyrics fr
 | `current_bold` | `true` | true, false | **Current bold.**  |
 | `fade` | `true` | true, false | **Fade far lines.** Lines further from the current one get fainter. |
 | `offset` | `0` | -10 to 10 | Seconds to shift the lyrics by if they come early (negative) or late (positive). |
-| `hide_when_idle` | `true` | true, false | **Hide when nothing plays.**  |
+| `hide_when_idle` | `true` | true, false | **Hide when nothing plays.** (The widget is empty anyway while nothing plays or the words are being looked up.) |
 
 ### widgets.toml [[widget]] type = "visualiser"
 

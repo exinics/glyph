@@ -113,57 +113,161 @@ internal static class WallpaperEngine
 
     public static bool Running => Process.GetProcessesByName("wallpaper64").Length > 0 || Process.GetProcessesByName("wallpaper32").Length > 0;
 
+    static HashSet<uint> Pids() =>
+        Process.GetProcessesByName("wallpaper64").Concat(Process.GetProcessesByName("wallpaper32")).Concat(Process.GetProcessesByName("webwallpaper32"))
+            .Select(p => (uint)p.Id).ToHashSet();
+
+    // ───────────── what Wallpaper Engine shows where ─────────────
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string? cls, string? title);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, Native.EnumWindowsProc f, IntPtr l);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out Native.RECT r);
+
+    /// The screens (Glyph's numbers) where a Wallpaper Engine wallpaper window is drawn right now: its windows
+    /// sit in the desktop's WorkerW (or Progman) like Glyph's own.
+    public static HashSet<int> ShowingOn()
+    {
+        var res = new HashSet<int>();
+        if (!Running) return res;
+        var pids = Pids();
+        var screens = Glyph.Desktop.Screens.All();
+        void Look(IntPtr parent)
+        {
+            if (parent == IntPtr.Zero) return;
+            EnumChildWindows(parent, (h, _) =>
+            {
+                GetWindowThreadProcessId(h, out var pid);
+                if (!pids.Contains(pid) || !Native.IsWindowVisible(h) || !GetWindowRect(h, out var r)) return true;
+                var rect = Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom);
+                foreach (var s in screens)
+                {
+                    var o = Rectangle.Intersect(rect, s.Bounds);
+                    if (o.Width * (long)o.Height > s.Bounds.Width * (long)s.Bounds.Height / 2) res.Add(s.Number);
+                }
+                return true;
+            }, IntPtr.Zero);
+        }
+        var progman = Native.FindWindow("Progman", null);
+        Look(progman);
+        for (IntPtr w = FindWindowEx(IntPtr.Zero, IntPtr.Zero, "WorkerW", null); w != IntPtr.Zero; w = FindWindowEx(IntPtr.Zero, w, "WorkerW", null)) Look(w);
+        return res;
+    }
+
+    /// Wallpaper Engine's own number for a screen (its -monitor N): from the screen map in its config.json (it keys
+    /// screens by their device id), so "screen 2" means the same screen to both programs. null = not known.
+    public static int? MonitorIndex(Glyph.Desktop.ScreenInfo s)
+    {
+        try
+        {
+            var id = DeviceId(s);
+            if (id == null || Root == null) return null;
+            var path = Path.Combine(Root, "config.json");
+            using var doc = JsonDocument.Parse(File.ReadAllText(path), new JsonDocumentOptions { AllowTrailingCommas = true });
+            foreach (var user in doc.RootElement.EnumerateObject())
+            {
+                if (user.Value.ValueKind != JsonValueKind.Object) continue;   // its file has a few plain values at the top too
+                if (!user.Value.TryGetProperty("general", out var g) || !g.TryGetProperty("user", out var u) || !u.TryGetProperty("monitormap", out var map)) continue;
+                foreach (var m in map.EnumerateObject())
+                    if (Norm(m.Name) == Norm(id) && m.Value.TryGetProperty("location", out var loc) && loc.TryGetInt32(out var n)) return n;
+            }
+        }
+        catch (Exception e) { Log.Write("wallpaper engine screen map: " + e.Message); }
+        return null;
+        static string Norm(string x) => x.Replace('\\', '/').ToLowerInvariant();
+    }
+
+    /// The folder of the wallpaper Wallpaper Engine has selected on its monitor `index` (from its config.json), or null.
+    public static string? PlayingOn(int index)
+    {
+        try
+        {
+            if (Root == null) return null;
+            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(Root, "config.json")), new JsonDocumentOptions { AllowTrailingCommas = true });
+            foreach (var user in doc.RootElement.EnumerateObject())
+                if (user.Value.ValueKind == JsonValueKind.Object && user.Value.TryGetProperty("general", out var g) && g.TryGetProperty("wallpaperconfig", out var wc) && wc.TryGetProperty("selectedwallpapers", out var sel)
+                    && sel.TryGetProperty($"Monitor{index}", out var m) && m.TryGetProperty("file", out var f) && f.GetString() is { Length: > 0 } file)
+                    return Path.GetDirectoryName(file.Replace('/', '\\'));
+        }
+        catch { }
+        return null;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    struct DISPLAY_DEVICE
+    {
+        public int cb;
+        [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 32)] public string DeviceName;
+        [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceString;
+        public int StateFlags;
+        [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceID;
+        [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceKey;
+    }
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)] static extern bool EnumDisplayDevices(string? device, uint i, ref DISPLAY_DEVICE dd, uint flags);
+
+    /// The monitor's device id (\\?\DISPLAY#AOC2270#...#{guid}), the key Wallpaper Engine uses.
+    static string? DeviceId(Glyph.Desktop.ScreenInfo s)
+    {
+        var adapter = $@"\\.\DISPLAY{s.Number}";
+        var dd = new DISPLAY_DEVICE { cb = System.Runtime.InteropServices.Marshal.SizeOf<DISPLAY_DEVICE>() };
+        if (EnumDisplayDevices(adapter, 0, ref dd, 1 /* EDD_GET_DEVICE_INTERFACE_NAME */) && dd.DeviceID.Length > 0) return dd.DeviceID;
+        return null;
+    }
+
+    // ───────────── commands, one at a time ─────────────
+
+    // Commands go to Wallpaper Engine through its exe. Each call starts a short-lived copy that passes the command
+    // on, and if Wallpaper Engine isn't running the first one starts it; sending several at once while it starts
+    // up made extra copies. So they queue: one at a time, and after a start nothing more is sent until it's up.
+    static readonly object queueGate = new();
+    static Task queue = Task.CompletedTask;
+
     static void Control(string args)
     {
         if (!Installed) return;
+        lock (queueGate) queue = queue.ContinueWith(_ => Run(args)).Unwrap();
+    }
+
+    static async Task Run(string args)
+    {
         try
         {
-            using var p = Process.Start(new ProcessStartInfo(Exe, args) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Root! });
+            bool starting = !Running;
+            if (starting && !args.Contains("openWallpaper")) return;   // only opening a wallpaper may start it
+            using (var p = Process.Start(new ProcessStartInfo(Exe, args) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Root! }))
+                if (p != null && !starting) await Task.Run(() => p.WaitForExit(5000));
             Log.Write($"wallpaper engine: {args}");
+            if (starting)
+                for (int i = 0; i < 60 && ShowingOn().Count == 0; i++) await Task.Delay(250);   // up to 15 s for it to start drawing
         }
         catch (Exception e) { Log.Write($"wallpaper engine {args}: {e.Message}"); }
     }
 
-    // What Glyph last asked for on each Wallpaper Engine monitor (so reloads don't restart the wallpaper)
-    static readonly Dictionary<int, string> shown = new();
-    static bool? muted;
-
-    /// Plays `item` on Wallpaper Engine's monitor `monitor` (0 = its first), starting Wallpaper Engine if needed.
-    public static void Show(int monitor, Item item, bool mute)
+    /// Plays `item` on Wallpaper Engine's monitor (its number), starting Wallpaper Engine if needed.
+    public static void Open(int monitor, Item item, bool mute)
     {
-        bool running = Running;
-        if (!running) shown.Clear();
-        if (!shown.TryGetValue(monitor, out var cur) || cur != item.Project)
-        {
-            Control($"-control openWallpaper -file \"{item.Project}\" -monitor {monitor}");
-            shown[monitor] = item.Project;
-            muted = null;
-        }
-        if (muted != mute) { Control(mute ? "-control mute" : "-control unmute"); muted = mute; }
+        Control($"-control openWallpaper -file \"{item.Project}\" -monitor {monitor}");
+        Control(mute ? "-control mute" : "-control unmute");
     }
 
-    /// Takes Glyph's wallpaper off one monitor (Wallpaper Engine keeps running for the others).
-    public static void Hide(int monitor)
-    {
-        if (!shown.Remove(monitor)) return;
-        if (Running) Control($"-control closeWallpaper -monitor {monitor}");
-    }
+    /// Takes Wallpaper Engine's wallpaper off one of its monitors (it keeps running for the others).
+    public static void Remove(int monitor) => Control($"-control closeWallpaper -monitor {monitor}");
 
-    /// Closes Wallpaper Engine entirely (Glyph draws every screen itself again).
-    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string? cls, string? title);
-    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
-    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    /// Takes all its wallpapers off (it keeps running, drawing nothing).
+    public static void RemoveAll() => Control("-control closeWallpaper");
+
     static volatile bool closing;
 
-    /// Asks Wallpaper Engine to quit the way Windows does at shut-down (a close message to its tray window), in
-    /// the background. Killing it made it think it had crashed: its next start showed a "Safe Start" box. If it
-    /// doesn't quit within a few seconds it's left running with no wallpaper (never killed).
-    public static void Close()
+    /// Asks Wallpaper Engine to quit the way Windows does (a close message to its tray window). Never killed:
+    /// that made it think it had crashed. `done(true)` when it quit, `done(false)` when it's still running after
+    /// a few seconds (some versions ignore the request; quitting from its own tray icon always works).
+    public static void TryClose(Action<bool>? done = null)
     {
-        shown.Clear(); muted = null;
-        if (!Running || closing) return;
+        if (!Running) { done?.Invoke(true); return; }
+        if (closing) return;
         closing = true;
-        var pids = Process.GetProcessesByName("wallpaper64").Concat(Process.GetProcessesByName("wallpaper32")).Select(p => (uint)p.Id).ToHashSet();
+        var pids = Pids();
         for (IntPtr h = FindWindowEx(IntPtr.Zero, IntPtr.Zero, "WPETrayWindow", null); h != IntPtr.Zero; h = FindWindowEx(IntPtr.Zero, h, "WPETrayWindow", null))
         {
             GetWindowThreadProcessId(h, out var pid);
@@ -174,8 +278,9 @@ internal static class WallpaperEngine
             try
             {
                 for (int i = 0; i < 24 && Running; i++) await Task.Delay(250);
-                if (Running) { Log.Write("Wallpaper Engine didn't quit when asked; its wallpaper is closed instead"); Control("-control closeWallpaper"); }
-                else Log.Write("closed Wallpaper Engine");
+                bool quit = !Running;
+                Log.Write(quit ? "closed Wallpaper Engine" : "Wallpaper Engine didn't quit when asked");
+                done?.Invoke(quit);
             }
             finally { closing = false; }
         });

@@ -36,7 +36,6 @@ internal sealed class App : ApplicationContext
         _ = ui.Handle;
         engine = new Engine(host);
         var s = AppSettings.Load(new List<string>());
-        if (s.CloseWallpaperEngine && !ThemeUsesEngine(s.Theme)) Glyph.Data.WallpaperEngine.Close();
         ApplyAutostart(s.StartWithWindows);
         DesktopIcons.Apply(s.HideDesktopIcons);
         Taskbar.Apply(s.Taskbar);
@@ -96,6 +95,7 @@ internal sealed class App : ApplicationContext
             var k = Glyph.Desktop.Screens.Key();
             if (k != screensKey) { screensKey = k; Log.Write("displays changed"); engine.RequestReload(); }
             host.Check(); UpdateTooltip(); Taskbar.Enforce(engine.CurrentSettings.Taskbar);
+            try { WatchWallpaperEngine(); } catch (Exception e) { Log.Write("wallpaper engine watch: " + e.Message); }
         };
         checkTimer.Start();
         activityTimer.Tick += (_, _) =>
@@ -278,11 +278,11 @@ internal sealed class App : ApplicationContext
         if (tray == null) return;
         var s = engine.CurrentSettings;
         ApplyAutostart(s.StartWithWindows);
-        ApplyWallpaperEngine(s);
+        CheckWallpaperEngine(s);
         // drawn see-through (over Wallpaper Engine) or not: a window can't change between the two kinds of drawing
         // surface (Windows refuses the second one, and the desktop froze on the old theme's last frame), so the
         // desktop windows are made again whenever that changes
-        var weKey = string.Join(",", engine.EngineWallpapers.Select(w => w.screen.Number));
+        var weKey = string.Join(",", engine.EngineWallpapers.Where(w => w.live).Select(w => w.screen.Number));
         if (lastWeKey != null && weKey != lastWeKey) { Log.Write("desktop: new windows (see-through drawing changed)"); host.Attach(); }
         lastWeKey = weKey;
         DesktopIcons.Apply(s.HideDesktopIcons);
@@ -417,20 +417,152 @@ internal sealed class App : ApplicationContext
         catch { return false; }
     }
 
-    /// Screens whose theme plays a Wallpaper Engine wallpaper get it (Wallpaper Engine is started for it);
-    /// when none does, Wallpaper Engine is closed (if Close Wallpaper Engine is on), as Glyph draws every screen.
-    void ApplyWallpaperEngine(AppSettings s)
+    // ───────────── Wallpaper Engine ─────────────
+    // Glyph only does something to Wallpaper Engine when Glyph starts or the theme (per screen) changes, never on an
+    // ordinary reload (saving a theme file), and it says what it does or asks first (glyph.toml: wallpaper_engine_themes,
+    // wallpaper_engine_hidden). It never kills Wallpaper Engine.
+
+    string? wePlanKey;
+    HashSet<int> weShowing = new();
+    readonly HashSet<string> weAsked = new();   // questions already answered for this plan
+
+    static string Screens_(IEnumerable<ScreenInfo> s)
     {
+        var l = s.Select(x => x.Number).OrderBy(n => n).ToList();
+        return Screens.All().Count <= 1 ? "your screen" : (l.Count == 1 ? "screen " : "screens ") + string.Join(" and ", l);
+    }
+
+    static int WeIndex(ScreenInfo sc) => Glyph.Data.WallpaperEngine.MonitorIndex(sc) ?? Math.Max(0, Screens.All().FindIndex(x => x.Number == sc.Number));
+
+    void SaveSetting(Action<AppSettings> change)
+    {
+        var s = AppSettings.Load(new List<string>());
+        change(s);
+        s.Save();
+    }
+
+    /// Looks at what the themes need from Wallpaper Engine and what it's doing, after Glyph starts or a theme changes.
+    void CheckWallpaperEngine(AppSettings s)
+    {
+        if (!Glyph.Data.WallpaperEngine.Installed) return;
         var want = engine.EngineWallpapers;
-        if (want.Count == 0)
+        var planKey = string.Join(";", engine.Plan.Select(p => p.screen.Number)) + "|" + s.Theme + "|" + string.Join(";", want.Select(w => $"{w.screen.Number}={w.item.Id}"));
+        if (planKey == wePlanKey) return;
+        wePlanKey = planKey;
+        weAsked.Clear();
+        weShowing = Glyph.Data.WallpaperEngine.ShowingOn();
+        foreach (var sc in Screens.All())
         {
-            if (s.CloseWallpaperEngine) Glyph.Data.WallpaperEngine.Close();
+            var idx = Glyph.Data.WallpaperEngine.MonitorIndex(sc);
+            Log.Write($"wallpaper engine: screen {sc.Number} = its monitor {idx?.ToString() ?? WeIndex(sc) + " (guessed)"}{(weShowing.Contains(sc.Number) ? ", showing a wallpaper" : "")}");
+        }
+        AskThemes(s);
+        AskHidden(s);
+    }
+
+    /// 1. Themes that show a Wallpaper Engine wallpaper it isn't showing.
+    void AskThemes(AppSettings s)
+    {
+        var need = engine.EngineWallpapers.Where(w => !(weShowing.Contains(w.screen.Number) && SameFolder(Glyph.Data.WallpaperEngine.PlayingOn(WeIndex(w.screen)), w.item.Folder))).ToList();
+        if (need.Count == 0 || s.WallpaperEngineThemes == "never") return;
+        var title = need[0].item.Title.Length > 0 ? need[0].item.Title : need[0].item.Id;
+        bool running = Glyph.Data.WallpaperEngine.Running;
+        void Open()
+        {
+            foreach (var (sc, item, mute, _) in need) Glyph.Data.WallpaperEngine.Open(WeIndex(sc), item, mute);
+            WatchForLive();
+        }
+        if (s.WallpaperEngineThemes == "open")
+        {
+            Open();
+            tray.ShowBalloonTip(5000, "Wallpaper Engine", $"Opening “{title}” in Wallpaper Engine for the theme “{s.Theme}”" + (running ? "." : " (starting it)."), ToolTipIcon.Info);
             return;
         }
-        var all = Screens.All();
-        int Monitor(ScreenInfo sc) => Math.Max(0, all.FindIndex(x => x.Number == sc.Number));   // Wallpaper Engine counts screens from 0
-        foreach (var sc in all) if (!want.Any(w => w.screen.Number == sc.Number)) Glyph.Data.WallpaperEngine.Hide(Monitor(sc));
-        foreach (var (sc, item, mute) in want) Glyph.Data.WallpaperEngine.Show(Monitor(sc), item, mute);
+        Glyph.Ui.Notice.Show("Wallpaper Engine",
+            $"The theme “{s.Theme}” shows the Wallpaper Engine wallpaper “{title}” under its widgets on {Screens_(need.Select(n => n.screen))}.\n\n" +
+            (running ? "Wallpaper Engine is open but isn't showing it there. Show it now? (This replaces what Wallpaper Engine shows on that screen.)"
+                     : "Wallpaper Engine isn't running. Start it with this wallpaper?") +
+            "\n\nUntil then the theme shows the wallpaper's still picture.",
+            new[] { running ? "Show it in Wallpaper Engine" : "Start Wallpaper Engine with it", "Not now" },
+            (k, remember) =>
+            {
+                if (k == 0) Open();
+                if (remember) SaveSetting(x => x.WallpaperEngineThemes = k == 0 ? "open" : "never");
+            },
+            "Remember this (Settings > General > Wallpaper Engine)");
+    }
+
+    /// 2. Wallpaper Engine playing on screens the theme covers with its own background.
+    void AskHidden(AppSettings s)
+    {
+        var plan = engine.Plan.Select(p => p.screen).ToList();
+        var weScreens = engine.EngineWallpapers.Select(w => w.screen.Number).ToHashSet();
+        var covered = plan.Where(p => !weScreens.Contains(p.Number) && weShowing.Contains(p.Number)).ToList();
+        var visible = weShowing.Where(n => !covered.Any(c => c.Number == n)).ToList();   // still seen: under see-through themes or where Glyph doesn't draw
+        if (covered.Count == 0)
+        {
+            if (visible.Count > 0 && plan.Count < Screens.All().Count)
+                tray.ShowBalloonTip(4000, "Wallpaper Engine is still open", $"Its wallpaper shows on {Screens_(Screens.All().Where(x => visible.Contains(x.Number)))}, where the theme doesn't draw. Glyph leaves it alone.", ToolTipIcon.Info);
+            return;
+        }
+        var mode = s.WallpaperEngineHidden;
+        if (mode == "leave") return;
+        bool indexKnown = covered.All(c => Glyph.Data.WallpaperEngine.MonitorIndex(c) != null) || Screens.All().Count == 1;
+        bool onlySome = visible.Count > 0;   // it also shows somewhere it's seen: closing it would take that away too
+        void Remove()
+        {
+            foreach (var c in covered) Glyph.Data.WallpaperEngine.Remove(WeIndex(c));
+            tray.ShowBalloonTip(4000, "Wallpaper Engine", $"Took its wallpaper off {Screens_(covered)}" + (onlySome ? "; it keeps showing on the others." : "; it's still running (quit it from its tray icon to free its memory)."), ToolTipIcon.Info);
+        }
+        void Close()
+        {
+            Glyph.Data.WallpaperEngine.TryClose(quit => ui.BeginInvoke(() =>
+            {
+                if (quit) { tray.ShowBalloonTip(3000, "Wallpaper Engine closed", "Glyph asked it to close and it did.", ToolTipIcon.Info); return; }
+                // it didn't close: stop it drawing hidden wallpapers instead, and say how to close it
+                foreach (var c in covered) Glyph.Data.WallpaperEngine.Remove(WeIndex(c));
+                Glyph.Ui.Notice.Show("Wallpaper Engine",
+                    "Wallpaper Engine didn't close when Glyph asked (it doesn't always listen). Glyph took its wallpaper off " + Screens_(covered) +
+                    " instead, so it isn't drawing anything you can't see.\n\nTo close it completely: right-click its icon next to the clock and choose Quit.",
+                    new[] { "OK" }, (_, _) => { });
+            }));
+        }
+        if (mode == "close") { if (onlySome) Remove(); else Close(); return; }
+        if (mode == "remove" && indexKnown) { Remove(); return; }
+
+        var buttons = new List<(string label, Action act, string remember)>();
+        if (!onlySome) buttons.Add(("Close Wallpaper Engine (Glyph asks it to quit)", Close, "close"));
+        if (indexKnown) buttons.Add(($"Take its wallpaper off {Screens_(covered)} only (it keeps running" + (onlySome ? " for the others)" : ")"), Remove, "remove"));
+        buttons.Add(("Leave it running", () => { }, "leave"));
+        Glyph.Ui.Notice.Show("Wallpaper Engine",
+            $"Wallpaper Engine is playing a wallpaper on {Screens_(covered)}, but the theme “{s.Theme}” draws its own background there, so you can't see it. It still uses your graphics card." +
+            (onlySome ? $"\n\nIt also shows on {Screens_(Screens.All().Where(x => visible.Contains(x.Number)))}, where you can still see it." : "") +
+            "\n\nYou can close it yourself (right-click its icon next to the clock > Quit), or Glyph can do something now:",
+            buttons.Select(b => b.label).ToArray(),
+            (k, remember) =>
+            {
+                buttons[k].act();
+                if (remember) SaveSetting(x => x.WallpaperEngineHidden = buttons[k].remember);
+            },
+            "Remember this (Settings > General > Wallpaper Engine)");
+    }
+
+    static bool SameFolder(string? a, string b) => a != null && Path.GetFullPath(a).TrimEnd('\\').Equals(Path.GetFullPath(b).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+
+    /// After opening a wallpaper: once Wallpaper Engine draws it, the theme switches from the still picture to it.
+    void WatchForLive() => weWatchUntil = Environment.TickCount64 + 20_000;
+    long weWatchUntil;
+
+    /// Every second: if Wallpaper Engine started or stopped drawing on a screen whose theme shows its wallpaper, the
+    /// desktop there changes between see-through and the still picture.
+    void WatchWallpaperEngine()
+    {
+        if (!Glyph.Data.WallpaperEngine.Installed || engine.EngineWallpapers.Count == 0) return;
+        if (Environment.TickCount64 > weWatchUntil && (Environment.TickCount64 / 1000) % 3 != 0) return;   // every 3 s, every second just after opening one
+        var now = Glyph.Data.WallpaperEngine.ShowingOn();
+        foreach (var w in engine.EngineWallpapers)
+            if (now.Contains(w.screen.Number) != w.live) { Log.Write($"Wallpaper Engine {(w.live ? "stopped" : "started")} drawing on screen {w.screen.Number}"); engine.RequestReload(); break; }
+        weShowing = now;
     }
 
     static void ApplyAutostart(bool on)

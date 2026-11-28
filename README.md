@@ -171,15 +171,18 @@ Glyph\
   such windows can't forward to each other. Re-raised every 2 s; broadcasts "TaskbarCreated" at start and when
   Explorer restarts. Clicks: v4 icons get (x,y | event, id) + NIN_SELECT / WM_CONTEXTMENU, older ones (id, event);
   AllowSetForegroundWindow(owner pid) first. Glyph's own FindWindow("Shell_TrayWnd") uses `Tray.ExplorerTray()`.
-- **Wallpaper Engine** (`Data\WallpaperEngine.cs`, backdrop type `wallpaper_engine`): finds Steam libraries
-  (HKCU SteamPath + libraryfolders.vdf), lists workshop/content/431960 + projects/myprojects + defaultprojects
-  (project.json title/type/preview). `Engine.LoadAll` sets `Composer.LiveEngine` per screen; then the desktop renderer
-  is a DirectComposition swap chain (premultiplied, cleared to alpha 0, screen effects skipped) on the same WorkerW
-  child, so WE's `WPEDesktopDX11Window` sibling shows through. WE raises its window when it opens a wallpaper:
-  `DesktopHost.KeepOnTop` (every second) puts ours back above (GW_HWNDPREV). `App.ApplyWallpaperEngine` runs
-  `wallpaper64.exe -control openWallpaper -file <project.json> -monitor <index in Screens.All()>` (+ mute/unmute,
-  closeWallpaper for screens that stop using it), only when the wanted wallpaper changed; no screen using it = WE closed
-  (if close_wallpaper_engine). Previews/snapshots draw the item's preview image instead.
+- **Wallpaper Engine** (`Data\WallpaperEngine.cs`, backdrop type `wallpaper_engine`, `App.CheckWallpaperEngine`): finds
+  Steam libraries and the wallpapers (workshop/content/431960, projects/myprojects, defaultprojects). Glyph acts on it
+  ONLY when it starts or the per-screen theme plan changes (never on ordinary reloads), and asks/says what it does
+  (glyph.toml `wallpaper_engine_themes` ask|open|never, `wallpaper_engine_hidden` ask|close|remove|leave; `UI\Notice.cs`
+  dialogs with "remember"). What it shows where = its windows in the desktop WorkerW/Progman mapped to screens
+  (`ShowingOn`). Screen numbering = its config.json `monitormap` (device interface id -> location) matched with
+  EnumDisplayDevices(EDD_GET_DEVICE_INTERFACE_NAME); what it plays = config.json `selectedwallpapers.MonitorN.file`.
+  Commands go through ONE queue (each spawns wallpaper64.exe -control ...; only openWallpaper may start it, and after a
+  start nothing else is sent until it draws: parallel commands while starting used to make several instances).
+  Never killed (that made it show "Safe Start"): `TryClose` posts WM_CLOSE to WPETrayWindow (it ignores that on this
+  version) and falls back to closeWallpaper. A theme screen is see-through only while it really draws there
+  (`EngineWallpapers.live`; App re-checks every 3 s and reloads on a change); otherwise the preview picture, softened.
 - **Side bar** (bar `position = left/right`, smooth themes): `BarOptions.PlaceIn` (bar rect + remaining area, used by
   the preview and snapshots), appbar ABE_LEFT/RIGHT, groups and icon/workspace/task/tray rows are `RowEl.Vertical`
   (Painter stacks them centred), text modules `rotate = down/up` (Painter draws the TextEl under a D2D rotation).

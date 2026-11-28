@@ -23,7 +23,9 @@ internal sealed class Engine
     /// The main screen's theme (theme sync, window frames, tiling and the launcher use it).
     public volatile Theme? CurrentTheme;
     /// What the app should set up after a reload: a wallpaper window on each of these screens, and a bar where set.
-    public volatile IReadOnlyList<(ScreenInfo screen, Glyph.Data.WallpaperEngine.Item item, bool mute)> EngineWallpapers = Array.Empty<(ScreenInfo, Glyph.Data.WallpaperEngine.Item, bool)>();
+    /// Screens whose theme shows a Wallpaper Engine wallpaper; live = Wallpaper Engine is drawing there (then the
+    /// desktop is see-through over it; otherwise the wallpaper's still picture is drawn).
+    public volatile IReadOnlyList<(ScreenInfo screen, Glyph.Data.WallpaperEngine.Item item, bool mute, bool live)> EngineWallpapers = Array.Empty<(ScreenInfo, Glyph.Data.WallpaperEngine.Item, bool, bool)>();
     public volatile IReadOnlyList<(ScreenInfo screen, BarOptions? bar)> Plan = Array.Empty<(ScreenInfo, BarOptions?)>();
     public event Action? Reloaded;
     /// Raised on the render thread when a shortcut should open (the app runs it on the UI thread).
@@ -167,7 +169,8 @@ internal sealed class Engine
         CurrentTheme = main?.Comp.Theme;
         Plan = next.Select(f => (f.S, f.ShowBar && f.Bar.Enabled ? f.Bar.O : (BarOptions?)null)).ToList();
         // screens whose theme plays a Wallpaper Engine wallpaper: drawn see-through over it (the app starts it)
-        var we = new List<(ScreenInfo screen, Glyph.Data.WallpaperEngine.Item item, bool mute)>();
+        var we = new List<(ScreenInfo screen, Glyph.Data.WallpaperEngine.Item item, bool mute, bool live)>();
+        var showing = next.Any(f => f.Comp.UsesEngine) ? Glyph.Data.WallpaperEngine.ShowingOn() : new HashSet<int>();
         foreach (var f in next)
         {
             var b = f.Comp.Scene.Options.Backdrop;
@@ -175,8 +178,8 @@ internal sealed class Engine
             if (f.Comp.UsesEngine && item == null) f.Comp.Problems.Add(Glyph.Data.WallpaperEngine.Installed
                 ? $"wallpaper.toml: Wallpaper Engine has no wallpaper \"{b.Engine}\" (pick one in Settings > Wallpaper)"
                 : "wallpaper.toml: the backdrop is a Wallpaper Engine wallpaper, but Wallpaper Engine isn't installed");
-            f.Comp.LiveEngine = item != null;
-            if (item != null) we.Add((f.S, item, b.EngineMute));
+            f.Comp.LiveEngine = item != null && showing.Contains(f.S.Number);
+            if (item != null) we.Add((f.S, item, b.EngineMute, f.Comp.LiveEngine));
         }
         EngineWallpapers = we;
         if (Launcher is { } lh && main != null) { lh.Scene.Theme = main.Comp.Theme; lh.Scene.O = main.Comp.Theme.Options.Launcher; lastLSig = ""; }

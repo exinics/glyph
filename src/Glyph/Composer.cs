@@ -241,7 +241,8 @@ internal sealed class Composer : IDisposable
         else if (b.Type == "image" && b.File.Length > 0) c.Picture(Paths.FindAsset(b.File, Theme.Name, "images"), area, b.Fit, b.Dim);
         else if (b.Type == "wallpaper_engine")
         {
-            if (!LiveEngine && Glyph.Data.WallpaperEngine.Find(b.Engine) is { Preview.Length: > 0 } we && File.Exists(we.Preview)) c.Picture(we.Preview, area, "cover", b.Dim);
+            // not playing (yet): its preview picture, softened (they're small, often a 300 px gif)
+            if (!LiveEngine && Glyph.Data.WallpaperEngine.Find(b.Engine) is { Preview.Length: > 0 } we && File.Exists(we.Preview)) c.Picture(we.Preview, area, "cover", b.Dim, soften: true);
             else if (LiveEngine && b.Dim > 0) c.Fill(area, new Rgba(0, 0, 0, 255), 0, b.Dim);
         }
         if (!Theme.Smooth) return;

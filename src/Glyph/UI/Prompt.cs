@@ -48,14 +48,8 @@ internal sealed class Prompt : Form
         if (!ownLoaded)
         {
             ownLoaded = true;
-            try
-            {
-                var dir = Path.Combine(Paths.Config, "fonts");
-                if (Directory.Exists(dir))
-                    foreach (var file in Directory.EnumerateFiles(dir).Where(x => x.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase) || x.EndsWith(".otf", StringComparison.OrdinalIgnoreCase)))
-                        try { own.AddFontFile(file); } catch { }
-            }
-            catch { }
+            foreach (var file in Glyph.Render.Fonts.Files().Where(x => x.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase) || x.EndsWith(".otf", StringComparison.OrdinalIgnoreCase)))
+                try { own.AddFontFile(file); } catch { }
         }
         return own.Families.FirstOrDefault(f => f.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? FontFamily.GenericSansSerif;
     }
